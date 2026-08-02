@@ -6,6 +6,8 @@
     <authors>DotKtx</authors>
     <license type="expression">Apache-2.0</license>
     <readme>README.md</readme>
+    <projectUrl>https://github.com/tmyt/dotktx-experimental-lspsupport</projectUrl>
+    <repository type="git" url="https://github.com/tmyt/dotktx-experimental-lspsupport.git" />
     <description>Experimental JetBrains Kotlin LSP workspace projection for DotKt projects. Models the Kotlin standard library with an analysis-only JVM JAR, overlays DotKt-specific kotlin.clr declarations, and generates Kotlin sources from CLR reference KLIBs.</description>
     <tags>dotkt kotlin clr lsp vscode experimental</tags>
   </metadata>

@@ -24,7 +24,7 @@ Add the package as a private, build-only dependency:
 <ItemGroup>
   <PackageReference
     Include="DotKtx.Experimental.LspSupport"
-    Version="0.1.0-alpha.1"
+    Version="0.9.0"
     PrivateAssets="all"
     IncludeAssets="build" />
 </ItemGroup>

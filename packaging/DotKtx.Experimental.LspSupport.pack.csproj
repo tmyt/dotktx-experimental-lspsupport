@@ -3,7 +3,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <NuspecFile>DotKtx.Experimental.LspSupport.nuspec</NuspecFile>
-    <NuspecProperties>version=$(VersionPrefix)-$(VersionSuffix);configuration=$(Configuration)</NuspecProperties>
+    <DotKtxPackageVersion>$(VersionPrefix)</DotKtxPackageVersion>
+    <DotKtxPackageVersion Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</DotKtxPackageVersion>
+    <NuspecProperties>version=$(DotKtxPackageVersion);configuration=$(Configuration)</NuspecProperties>
     <NoWarn>NU5100;NU5128</NoWarn>
   </PropertyGroup>
   <ItemGroup>

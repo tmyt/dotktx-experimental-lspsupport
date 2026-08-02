@@ -1,0 +1,47 @@
+<Project>
+  <PropertyGroup>
+    <_DotKtxExperimentalLspToolDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net10.0/any/'))</_DotKtxExperimentalLspToolDir>
+    <_DotKtxExperimentalLspTool>$(_DotKtxExperimentalLspToolDir)DotKtx.Experimental.LspSupport.dll</_DotKtxExperimentalLspTool>
+    <_DotKtxExperimentalLspKlibs>$(BaseIntermediateOutputPath)dotkt-lsp-klibs.rsp</_DotKtxExperimentalLspKlibs>
+    <_DotKtxExperimentalLspSources>$(BaseIntermediateOutputPath)dotkt-lsp-sources.rsp</_DotKtxExperimentalLspSources>
+    <_DotKtxExperimentalLspStamp>$(DotKtxExperimentalLspRoot)/.stamp</_DotKtxExperimentalLspStamp>
+    <_DotKtxExperimentalLspStdlib>$(_DotKtxExperimentalLspToolDir)kotlin-stdlib.jar</_DotKtxExperimentalLspStdlib>
+    <_DotKtxExperimentalLspOverlay>$(_DotKtxExperimentalLspToolDir)dotkt-lsp-overlay.jar</_DotKtxExperimentalLspOverlay>
+  </PropertyGroup>
+
+  <Target Name="DotKtxWriteExperimentalLspInputs"
+          DependsOnTargets="DotKtGenerateReferenceKlibs;DotKtResolveReferenceSets"
+          Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
+    <ItemGroup>
+      <!-- NuGet .props are imported before some SDK default items. Enforce the boundary again here,
+           immediately before both projection and KotlinCompile consume @(KotlinCompile). -->
+      <KotlinCompile Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
+      <UpToDateCheckInput Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
+      <_DotKtxExperimentalLspKlib Include="@(_DotKtKlibReference->'%(KlibPath)')" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_DotKtxExperimentalLspKlibs)"
+                      Lines="@(_DotKtxExperimentalLspKlib->'%(FullPath)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_DotKtxExperimentalLspSources)"
+                      Lines="@(KotlinCompile->'%(FullPath)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="DotKtxGenerateExperimentalLspWorkspace"
+          BeforeTargets="KotlinCompile"
+          DependsOnTargets="DotKtxWriteExperimentalLspInputs"
+          Inputs="$(_DotKtxExperimentalLspTool);$(_DotKtxExperimentalLspStdlib);$(_DotKtxExperimentalLspOverlay);$(MSBuildProjectFullPath);$(_DotKtxExperimentalLspKlibs);$(_DotKtxExperimentalLspSources);@(_DotKtxExperimentalLspKlib)"
+          Outputs="$(_DotKtxExperimentalLspStamp);$(MSBuildProjectDirectory)/workspace.json"
+          Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
+    <Message Importance="high" Text="DotKtx.Experimental.LspSupport: generating analysis workspace from @(_DotKtxExperimentalLspKlib->Count()) KLIB(s)" />
+    <Exec Command="dotnet &quot;$(_DotKtxExperimentalLspTool)&quot; generate --project &quot;$(MSBuildProjectDirectory)&quot; --name &quot;$(MSBuildProjectName)&quot; --output &quot;$(DotKtxExperimentalLspRoot)&quot; --sources &quot;$(_DotKtxExperimentalLspSources)&quot; --klibs &quot;$(_DotKtxExperimentalLspKlibs)&quot; --stdlib &quot;$(_DotKtxExperimentalLspStdlib)&quot; --overlay &quot;$(_DotKtxExperimentalLspOverlay)&quot;" />
+  </Target>
+
+  <Target Name="DotKtxCleanExperimentalLspWorkspace"
+          BeforeTargets="CoreClean"
+          Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet &quot;$(_DotKtxExperimentalLspTool)&quot; clean --project &quot;$(MSBuildProjectDirectory)&quot; --output &quot;$(DotKtxExperimentalLspRoot)&quot;" />
+  </Target>
+</Project>

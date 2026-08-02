@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>DotKtx.Experimental.LspSupport</AssemblyName>
+    <RootNamespace>DotKtx.Experimental.LspSupport</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.83.0" PrivateAssets="all" />
+    <!-- Build-time compiler host only. Its package layout is consumed here while producing this
+         experimental package; projects using LspSupport never observe or resolve this path. -->
+    <PackageReference Include="DotKt.Toolchain"
+                      Version="$(DotKtVersion)"
+                      GeneratePathProperty="true"
+                      PrivateAssets="all"
+                      ExcludeAssets="all" />
+    <Protobuf Include="KlibMetadata.proto" GrpcServices="None" />
+  </ItemGroup>
+
+  <!-- Produce two self-contained analysis libraries beside the .NET tool. The ordinary JVM stdlib
+       is the temporary Kotlin API model understood by JetBrains LSP; the tiny overlay carries only
+       DotKt-specific kotlin.clr declarations absent from that JAR. Neither is a DotKt compiler input. -->
+  <Target Name="BuildDotKtLspAnalysisLibraries"
+          AfterTargets="Build"
+          Inputs="$(MSBuildThisFileDirectory)../DotKtx.Experimental.LspSupport.Overlay/DotKtLspOverlay.kt;$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-compiler-embeddable-$(DotKtKotlinVersion).jar;$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar"
+          Outputs="$(TargetDir)dotkt-lsp-overlay.jar;$(TargetDir)kotlin-stdlib.jar">
+    <PropertyGroup>
+      <_DotKtCompilerHostLib>$(PkgDotKt_Toolchain)/tools/kotc/lib</_DotKtCompilerHostLib>
+      <_DotKtJvmStdlib>$(_DotKtCompilerHostLib)/kotlin-stdlib-$(DotKtKotlinVersion).jar</_DotKtJvmStdlib>
+      <_DotKtLspOverlaySource>$(MSBuildThisFileDirectory)../DotKtx.Experimental.LspSupport.Overlay/DotKtLspOverlay.kt</_DotKtLspOverlaySource>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_DotKtJvmStdlib)')"
+           Text="DotKt.Toolchain $(DotKtVersion) does not contain Kotlin stdlib $(DotKtKotlinVersion)." />
+    <Exec Command="java -cp &quot;$(_DotKtCompilerHostLib)/*&quot; org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Xallow-kotlin-package -no-stdlib -classpath &quot;$(_DotKtJvmStdlib)&quot; -module-name dotkt_lsp_overlay -d &quot;$(TargetDir)dotkt-lsp-overlay.jar&quot; &quot;$(_DotKtLspOverlaySource)&quot;" />
+    <Copy SourceFiles="$(_DotKtJvmStdlib)" DestinationFiles="$(TargetDir)kotlin-stdlib.jar" />
+  </Target>
+</Project>

@@ -1,0 +1,7 @@
+artifacts/
+bin/
+obj/
+.dotkt/
+.lsp-system/
+workspace.json
+*.user

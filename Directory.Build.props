@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>alpha.1</VersionSuffix>
+    <!-- The analysis JARs deliberately approximate this DotKt/Kotlin release pair. Update the
+         hand-authored overlay whenever either version changes. -->
+    <DotKtVersion>0.9.8</DotKtVersion>
+    <DotKtKotlinVersion>2.4.0</DotKtKotlinVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

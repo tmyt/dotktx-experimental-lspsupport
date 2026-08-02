@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <DotKtxExperimentalLspSupportEnabled Condition="'$(DotKtxExperimentalLspSupportEnabled)' == ''">true</DotKtxExperimentalLspSupportEnabled>
+    <DotKtxExperimentalLspRoot Condition="'$(DotKtxExperimentalLspRoot)' == ''">$(MSBuildProjectDirectory)/.dotkt/lsp</DotKtxExperimentalLspRoot>
+    <_DotKtxExperimentalLspRelativeRoot>$([MSBuild]::MakeRelative('$(MSBuildProjectDirectory)', '$(DotKtxExperimentalLspRoot)'))</_DotKtxExperimentalLspRelativeRoot>
+  </PropertyGroup>
+
+  <!-- The generated declarations are an editor projection, never DotKt compiler inputs. -->
+  <ItemGroup>
+    <KotlinCompile Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
+    <UpToDateCheckInput Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
+  </ItemGroup>
+</Project>

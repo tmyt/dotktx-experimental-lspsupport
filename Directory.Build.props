@@ -1,10 +1,10 @@
 <Project>
   <PropertyGroup>
-    <VersionPrefix>0.9.0</VersionPrefix>
+    <VersionPrefix>0.9.9</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <!-- The analysis JARs deliberately approximate this DotKt/Kotlin release pair. Update the
          hand-authored overlay whenever either version changes. -->
-    <DotKtVersion>0.9.8</DotKtVersion>
+    <DotKtVersion>0.9.9</DotKtVersion>
     <DotKtKotlinVersion>2.4.0</DotKtKotlinVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

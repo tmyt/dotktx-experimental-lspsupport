@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs"
+import { loadavg } from "node:os"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -9,9 +10,22 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 const projectDir = resolve(dirname(fileURLToPath(import.meta.url)))
 const sourcePath = join(projectDir, "src", "Program.kt")
 const sourceUri = pathToFileURL(sourcePath).href
+const projectionPath = join(projectDir, "src", "JavaProjection.kt")
+const projectionUri = pathToFileURL(projectionPath).href
 const rootUri = pathToFileURL(projectDir).href
 const documentText = readFileSync(sourcePath, "utf8")
-const analysisDocumentText = "import kotlin.clr.\n" + documentText
+// The projection report is the only place that records which representation the build produced, and
+// the two representations are observably different in the editor.
+const reportPath = join(projectDir, ".dotkt", "lsp", "projection-report.md")
+const metadataEnabled = existsSync(reportPath) &&
+    /^- metadata\.class: /m.test(readFileSync(reportPath, "utf8"))
+const projectionDocumentText = readFileSync(projectionPath, "utf8")
+const baseAnalysisDocumentText = "import kotlin.clr.\n" + documentText
+const analysisDocumentText = baseAnalysisDocumentText
+const ownsSystemPath = !process.env.KOTLIN_LSP_SYSTEM_PATH
+const systemPath = process.env.KOTLIN_LSP_SYSTEM_PATH ??
+    join(projectDir, ".dotkt", `lsp-verifier-${process.pid}`)
+const analyzerIndexDir = join(systemPath, "index")
 
 function findServer() {
     if (process.env.KOTLIN_LSP_SERVER) return process.env.KOTLIN_LSP_SERVER
@@ -43,7 +57,7 @@ if (!serverPath) {
 
 const child = spawn(serverPath, [
     "--stdio",
-    "--system-path", join(projectDir, ".lsp-system", String(process.pid)),
+    "--system-path", systemPath,
     "--log-level", "WARNING",
 ], {
     cwd: projectDir,
@@ -56,6 +70,7 @@ child.stderr.on("data", chunk => process.stderr.write(chunk))
 let nextId = 1
 const pending = new Map()
 let incoming = Buffer.alloc(0)
+let latestDiagnostics = []
 
 function send(message) {
     const json = JSON.stringify(message)
@@ -100,6 +115,11 @@ function handle(message) {
         pending.delete(message.id)
         if (message.error) waiter.reject(new Error(JSON.stringify(message.error)))
         else waiter.resolve(message.result)
+        return
+    }
+
+    if (message.method === "textDocument/publishDiagnostics" && message.params?.uri === sourceUri) {
+        latestDiagnostics = message.params.diagnostics ?? []
         return
     }
 
@@ -159,13 +179,31 @@ function completionLabels(result) {
     return items.map(item => item.label)
 }
 
-async function waitForCompletion(position, expected) {
+function hoverText(result) {
+    const contents = result?.contents
+    if (typeof contents === "string") return contents
+    if (Array.isArray(contents)) return contents.map(item =>
+        typeof item === "string" ? item : item?.value ?? ""
+    ).join("\n")
+    return contents?.value ?? ""
+}
+
+function positionAfter(text, needle) {
+    const index = text.indexOf(needle)
+    if (index < 0) throw new Error(`Probe text was not found: ${needle}`)
+    const end = index + needle.length
+    const prefix = text.slice(0, end)
+    const lines = prefix.split("\n")
+    return { line: lines.length - 1, character: lines.at(-1).length }
+}
+
+async function waitForCompletion(position, expected, uri = sourceUri) {
     const deadline = Date.now() + 180_000
     let labels = []
     while (Date.now() < deadline) {
         try {
             const result = await request("textDocument/completion", {
-                textDocument: { uri: sourceUri },
+                textDocument: { uri },
                 position,
                 context: { triggerKind: 1 },
             })
@@ -183,6 +221,11 @@ async function waitForCompletion(position, expected) {
     )
 }
 
+// Cold-index time is the number that decides whether this model is usable, and it is meaningless
+// without the load it was taken under: on a busy machine the same run varies by a factor of two.
+const startedAt = Date.now()
+const loadAtStart = loadavg()[0]
+
 try {
     const initializeResult = await request("initialize", {
         processId: process.pid,
@@ -193,6 +236,7 @@ try {
         initializationOptions: {
             defaultSdk: null,
             buildTools: { [rootUri]: "json" },
+            indexDir: analyzerIndexDir,
         },
         capabilities: {
             workspace: {
@@ -209,6 +253,7 @@ try {
                     },
                 },
                 definition: { linkSupport: true },
+                hover: { contentFormat: ["markdown", "plaintext"] },
             },
         },
         workDoneToken: "dotkt-lsp-support-import",
@@ -224,6 +269,14 @@ try {
             languageId: "kotlin",
             version: 1,
             text: analysisDocumentText,
+        },
+    })
+    notify("textDocument/didOpen", {
+        textDocument: {
+            uri: projectionUri,
+            languageId: "kotlin",
+            version: 1,
+            text: projectionDocumentText,
         },
     })
 
@@ -243,6 +296,11 @@ try {
         { line: 1, character: "import System.Text.".length },
         "StringBuilder",
     )
+    for (const expected of ["Encoding", "Rune", "StringBuilder", "UTF8Encoding"]) {
+        if (!importLabels.includes(expected)) {
+            throw new Error(`Java-projected import completion did not contain '${expected}'`)
+        }
+    }
     const memberLabels = await waitForCompletion(
         { line: 5, character: "    builder.".length },
         "Append",
@@ -252,26 +310,141 @@ try {
             throw new Error(`Member completion did not contain '${expected}'`)
         }
     }
-
     const definitions = await request("textDocument/definition", {
         textDocument: { uri: sourceUri },
         position: { line: 1, character: "import System.Text.Stri".length },
     })
     const locations = Array.isArray(definitions) ? definitions : definitions ? [definitions] : []
     const definitionUris = locations.map(location => location.targetUri ?? location.uri)
-    if (!definitionUris.some(uri => uri?.includes("/.dotkt/lsp/stubs/"))) {
+    if (!definitionUris.some(uri => uri?.includes("dotkt-klib-java-stubs.jar"))) {
         throw new Error(`Definition did not navigate to the CLR stub: ${definitionUris.join(", ")}`)
+    }
+
+    const hover = await request("textDocument/hover", {
+        textDocument: { uri: sourceUri },
+        position: { line: 7, character: "    return builder.ToStr".length },
+    })
+    const renderedHover = hoverText(hover)
+    if (metadataEnabled) {
+        // With kotlin.Metadata the declaration is the KLIB's own, so a CLR non-null String stays
+        // non-null. The Java-only path physically cannot express that: an unannotated Java return is
+        // flexible and always renders with the nullable upper bound.
+        if (!/ToString\(\): String(?!\?)/.test(renderedHover)) {
+            throw new Error(`ToString hover did not expose the declared Kotlin return type: ${renderedHover}`)
+        }
+    } else if (!renderedHover.includes("ToString(): String?")) {
+        // Kotlin's internal type is flexible for an unannotated Java String return. The LSP hover renderer
+        // prints its nullable upper bound rather than source-only `String!`; the non-null return statement in
+        // Program.kt verifies that it was not imported as an ordinary nullable Kotlin type.
+        throw new Error(`ToString hover did not expose the Java flexible-type upper bound: ${renderedHover}`)
+    }
+    const typeErrors = latestDiagnostics.filter(diagnostic =>
+        /type mismatch|return type mismatch/i.test(diagnostic.message ?? "")
+    )
+    if (typeErrors.length !== 0) {
+        throw new Error(`Java platform return was rejected as Kotlin String: ${JSON.stringify(typeErrors)}`)
+    }
+
+    const encodingLabels = await waitForCompletion(
+        positionAfter(projectionDocumentText, "Encoding."),
+        "UTF8",
+        projectionUri,
+    )
+    for (const expected of ["GetEncoding", "UTF8"]) {
+        if (!encodingLabels.includes(expected)) {
+            throw new Error(`Encoding static completion did not contain '${expected}'`)
+        }
+    }
+    const encodingDefinitions = await request("textDocument/definition", {
+        textDocument: { uri: projectionUri },
+        position: {
+            line: 0,
+            character: "import System.Text.Enco".length,
+        },
+    })
+    const encodingLocations = Array.isArray(encodingDefinitions)
+        ? encodingDefinitions
+        : encodingDefinitions ? [encodingDefinitions] : []
+    const encodingDefinitionUris = encodingLocations.map(location => location.targetUri ?? location.uri)
+    if (!encodingDefinitionUris.some(uri => uri?.includes("dotkt-klib-java-stubs.jar"))) {
+        throw new Error(`Encoding definition did not navigate to the Java stub: ${encodingDefinitionUris.join(", ")}`)
+    }
+
+    const runeLabels = await waitForCompletion(
+        positionAfter(projectionDocumentText, "Rune(value)."),
+        "Value",
+        projectionUri,
+    )
+    for (const expected of ["ToString", "Value"]) {
+        if (!runeLabels.includes(expected)) {
+            throw new Error(`Rune member completion did not contain '${expected}'`)
+        }
+    }
+    const utf8EncodingLabels = await waitForCompletion(
+        positionAfter(projectionDocumentText, "UTF8Encoding()."),
+        "WebName",
+        projectionUri,
+    )
+    if (!utf8EncodingLabels.includes("WebName")) {
+        throw new Error("UTF8Encoding completion did not inherit Encoding.WebName")
+    }
+    const enumLabels = await waitForCompletion(
+        positionAfter(projectionDocumentText, "day == DayOfWeek."),
+        "Saturday",
+        projectionUri,
+    )
+    for (const expected of ["Saturday", "Sunday", "Monday"]) {
+        if (!enumLabels.includes(expected)) {
+            throw new Error(`CLR enum completion did not contain '${expected}'`)
+        }
+    }
+    const genericHover = await request("textDocument/hover", {
+        textDocument: { uri: projectionUri },
+        position: positionAfter(projectionDocumentText, "builder.AppendJ"),
+    })
+    const renderedGenericHover = hoverText(genericHover)
+    if (!renderedGenericHover.includes("<T") || !renderedGenericHover.includes("IEnumerable<T")) {
+        throw new Error(`AppendJoin hover lost its generic signature: ${renderedGenericHover}`)
+    }
+    const interfaceDefinitions = await request("textDocument/definition", {
+        textDocument: { uri: projectionUri },
+        position: positionAfter(projectionDocumentText, "System.IClone"),
+    })
+    const interfaceLocations = Array.isArray(interfaceDefinitions)
+        ? interfaceDefinitions
+        : interfaceDefinitions ? [interfaceDefinitions] : []
+    const interfaceDefinitionUris = interfaceLocations.map(location => location.targetUri ?? location.uri)
+    if (!interfaceDefinitionUris.some(uri => uri?.includes("dotkt-klib-java-stubs.jar"))) {
+        throw new Error(`ICloneable definition did not navigate to the Java stub: ${interfaceDefinitionUris.join(", ")}`)
     }
 
     console.log("Kotlin LSP DotKt overlay completion: ClrEvent, ClrRef, EventSubscription, Span, StackBuffer, byref, clrEvent, stackBuffer")
     console.log("Kotlin LSP import completion: StringBuilder")
     console.log("Kotlin LSP member completion: Append, Length, ToString")
-    console.log("Kotlin LSP definition: .dotkt/lsp/stubs/.../Declarations.kt")
+    console.log("Kotlin LSP multi-class completion: Encoding.GetEncoding, Encoding.UTF8, Rune.ToString, Rune.Value")
+    console.log("Kotlin LSP Java inheritance completion: UTF8Encoding.WebName")
+    console.log("Kotlin LSP CLR enum completion: DayOfWeek.Monday, DayOfWeek.Saturday, DayOfWeek.Sunday")
+    console.log("Kotlin LSP Java generic hover: AppendJoin<T>(..., IEnumerable<T>)")
+    console.log("Kotlin LSP Java interface definition: System.ICloneable")
+    console.log("Kotlin LSP definition: dotkt-klib-java-stubs.jar!/System/Text/StringBuilder.class")
+    console.log(metadataEnabled
+        ? "Kotlin LSP metadata hover: ToString(): String (declared, not approximated)"
+        : "Kotlin LSP Java-platform hover upper bound: ToString(): String?")
+
+    const elapsed = (Date.now() - startedAt) / 1000
+    console.log(
+        `Kotlin LSP cold index and all assertions: ${elapsed.toFixed(1)}s ` +
+        `(1-minute load average ${loadAtStart.toFixed(1)} at start, ${loadavg()[0].toFixed(1)} at end; ` +
+        `a figure taken above ~1.0 is not comparable)`
+    )
 
     await request("shutdown", null, 30_000)
     notify("exit")
     await childExit
 } catch (error) {
     child.kill("SIGTERM")
+    await childExit.catch(() => {})
     throw error
+} finally {
+    if (ownsSystemPath) rmSync(systemPath, { recursive: true, force: true })
 }

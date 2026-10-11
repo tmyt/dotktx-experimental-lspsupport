@@ -2,6 +2,10 @@
   <PropertyGroup>
     <DotKtxExperimentalLspSupportEnabled Condition="'$(DotKtxExperimentalLspSupportEnabled)' == ''">true</DotKtxExperimentalLspSupportEnabled>
     <DotKtxExperimentalLspRoot Condition="'$(DotKtxExperimentalLspRoot)' == ''">$(MSBuildProjectDirectory)/.dotkt/lsp</DotKtxExperimentalLspRoot>
+    <!-- Which CLR declarations become analysis-only JVM classfiles instead of Kotlin source stubs.
+         ';' separated: type:<fqn> | package:<prefix> | library:<name> | all | no-supertype-closure | strict.
+         Empty keeps the set this repository has verified end to end against a real JetBrains Kotlin LSP. -->
+    <DotKtxExperimentalLspJavaProjection Condition="'$(DotKtxExperimentalLspJavaProjection)' == ''"></DotKtxExperimentalLspJavaProjection>
     <_DotKtxExperimentalLspRelativeRoot>$([MSBuild]::MakeRelative('$(MSBuildProjectDirectory)', '$(DotKtxExperimentalLspRoot)'))</_DotKtxExperimentalLspRelativeRoot>
   </PropertyGroup>
 

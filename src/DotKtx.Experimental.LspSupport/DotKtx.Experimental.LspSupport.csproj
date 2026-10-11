@@ -18,23 +18,42 @@
                       PrivateAssets="all"
                       ExcludeAssets="all" />
     <Protobuf Include="KlibMetadata.proto" GrpcServices="None" />
+    <Protobuf Include="JvmMetadata.proto" GrpcServices="None" />
+    <!-- The emitted kotlin.Metadata version has to track the Kotlin release whose stdlib this package
+         ships, so it is carried from the single property that pins it rather than duplicated in code. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>DotKtKotlinVersion</_Parameter1>
+      <_Parameter2>$(DotKtKotlinVersion)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
-  <!-- Produce two self-contained analysis libraries beside the .NET tool. The ordinary JVM stdlib
-       is the temporary Kotlin API model understood by JetBrains LSP; the tiny overlay carries only
-       DotKt-specific kotlin.clr declarations absent from that JAR. Neither is a DotKt compiler input. -->
-  <Target Name="BuildDotKtLspAnalysisLibraries"
+  <!-- The only thing still taken from the JVM distribution is the Kotlin builtins: `Any`, `Int`,
+       `List` and the rest of the core classifier set, which the analyzer reads from resources rather
+       than classfiles and which the JVM maps onto java.lang types. Everything else - including
+       kotlin.clr - is projected from DotKt's own CLR standard library KLIB at project build time, so
+       no JVM-only stdlib API can reach completion. This is not a DotKt compiler input. -->
+  <Target Name="BuildDotKtLspBuiltins"
           AfterTargets="Build"
-          Inputs="$(MSBuildThisFileDirectory)../DotKtx.Experimental.LspSupport.Overlay/DotKtLspOverlay.kt;$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-compiler-embeddable-$(DotKtKotlinVersion).jar;$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar"
-          Outputs="$(TargetDir)dotkt-lsp-overlay.jar;$(TargetDir)kotlin-stdlib.jar">
+          Inputs="$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar"
+          Outputs="$(TargetDir)kotlin-builtins.jar">
     <PropertyGroup>
-      <_DotKtCompilerHostLib>$(PkgDotKt_Toolchain)/tools/kotc/lib</_DotKtCompilerHostLib>
-      <_DotKtJvmStdlib>$(_DotKtCompilerHostLib)/kotlin-stdlib-$(DotKtKotlinVersion).jar</_DotKtJvmStdlib>
-      <_DotKtLspOverlaySource>$(MSBuildThisFileDirectory)../DotKtx.Experimental.LspSupport.Overlay/DotKtLspOverlay.kt</_DotKtLspOverlaySource>
+      <_DotKtJvmStdlib>$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar</_DotKtJvmStdlib>
+      <_DotKtBuiltinsStaging>$(IntermediateOutputPath)kotlin-builtins/</_DotKtBuiltinsStaging>
     </PropertyGroup>
     <Error Condition="!Exists('$(_DotKtJvmStdlib)')"
            Text="DotKt.Toolchain $(DotKtVersion) does not contain Kotlin stdlib $(DotKtKotlinVersion)." />
-    <Exec Command="java -cp &quot;$(_DotKtCompilerHostLib)/*&quot; org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Xallow-kotlin-package -no-stdlib -classpath &quot;$(_DotKtJvmStdlib)&quot; -module-name dotkt_lsp_overlay -d &quot;$(TargetDir)dotkt-lsp-overlay.jar&quot; &quot;$(_DotKtLspOverlaySource)&quot;" />
-    <Copy SourceFiles="$(_DotKtJvmStdlib)" DestinationFiles="$(TargetDir)kotlin-stdlib.jar" />
+    <RemoveDir Directories="$(_DotKtBuiltinsStaging)" />
+    <Unzip SourceFiles="$(_DotKtJvmStdlib)" DestinationFolder="$(_DotKtBuiltinsStaging)" />
+    <ItemGroup>
+      <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)**/*.kotlin_builtins" />
+      <_DotKtBuiltinsDrop Include="$(_DotKtBuiltinsStaging)**/*" Exclude="@(_DotKtBuiltinsKeep)" />
+    </ItemGroup>
+    <Error Condition="'@(_DotKtBuiltinsKeep->Count())' == '0'"
+           Text="Kotlin stdlib $(DotKtKotlinVersion) contains no *.kotlin_builtins resources." />
+    <Delete Files="@(_DotKtBuiltinsDrop)" />
+    <ZipDirectory SourceDirectory="$(_DotKtBuiltinsStaging)"
+                  DestinationFile="$(TargetDir)kotlin-builtins.jar"
+                  Overwrite="true" />
   </Target>
+
 </Project>

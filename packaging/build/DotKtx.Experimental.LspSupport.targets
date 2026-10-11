@@ -4,20 +4,27 @@
     <_DotKtxExperimentalLspTool>$(_DotKtxExperimentalLspToolDir)DotKtx.Experimental.LspSupport.dll</_DotKtxExperimentalLspTool>
     <_DotKtxExperimentalLspKlibs>$(BaseIntermediateOutputPath)dotkt-lsp-klibs.rsp</_DotKtxExperimentalLspKlibs>
     <_DotKtxExperimentalLspSources>$(BaseIntermediateOutputPath)dotkt-lsp-sources.rsp</_DotKtxExperimentalLspSources>
+    <!-- The policy is written to disk so that changing the property alone invalidates the projection;
+         MSBuild's Inputs/Outputs comparison only ever sees files. -->
+    <_DotKtxExperimentalLspPolicy>$(BaseIntermediateOutputPath)dotkt-lsp-policy.rsp</_DotKtxExperimentalLspPolicy>
     <_DotKtxExperimentalLspStamp>$(DotKtxExperimentalLspRoot)/.stamp</_DotKtxExperimentalLspStamp>
-    <_DotKtxExperimentalLspStdlib>$(_DotKtxExperimentalLspToolDir)kotlin-stdlib.jar</_DotKtxExperimentalLspStdlib>
-    <_DotKtxExperimentalLspOverlay>$(_DotKtxExperimentalLspToolDir)dotkt-lsp-overlay.jar</_DotKtxExperimentalLspOverlay>
+    <_DotKtxExperimentalLspBuiltins>$(_DotKtxExperimentalLspToolDir)kotlin-builtins.jar</_DotKtxExperimentalLspBuiltins>
   </PropertyGroup>
 
   <Target Name="DotKtxWriteExperimentalLspInputs"
-          DependsOnTargets="DotKtGenerateReferenceKlibs;DotKtResolveReferenceSets"
+          DependsOnTargets="DotKtPrepareFrontendInputs"
           Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
     <ItemGroup>
       <!-- NuGet .props are imported before some SDK default items. Enforce the boundary again here,
            immediately before both projection and KotlinCompile consume @(KotlinCompile). -->
       <KotlinCompile Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
       <UpToDateCheckInput Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
-      <_DotKtxExperimentalLspKlib Include="@(_DotKtKlibReference->'%(KlibPath)')" />
+      <!-- DotKt 0.9.9 publishes both halves of the frontend classpath. The reference KLIBs carry the
+           CLR assemblies; the StandardLibrary entry is DotKt's own Kotlin stdlib, and projecting it is
+           what keeps JVM-only stdlib APIs out of the editor. -->
+      <_DotKtxExperimentalLspKlib Include="@(DotKtReferenceKlib)" />
+      <_DotKtxExperimentalLspStdlibKlib Include="@(DotKtFrontendKlib)"
+                                        Condition="'%(DotKtFrontendKlib.Role)' == 'StandardLibrary'" />
     </ItemGroup>
     <WriteLinesToFile File="$(_DotKtxExperimentalLspKlibs)"
                       Lines="@(_DotKtxExperimentalLspKlib->'%(FullPath)')"
@@ -27,16 +34,23 @@
                       Lines="@(KotlinCompile->'%(FullPath)')"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_DotKtxExperimentalLspPolicy)"
+                      Lines="$(DotKtxExperimentalLspJavaProjection)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
   </Target>
 
   <Target Name="DotKtxGenerateExperimentalLspWorkspace"
           BeforeTargets="KotlinCompile"
           DependsOnTargets="DotKtxWriteExperimentalLspInputs"
-          Inputs="$(_DotKtxExperimentalLspTool);$(_DotKtxExperimentalLspStdlib);$(_DotKtxExperimentalLspOverlay);$(MSBuildProjectFullPath);$(_DotKtxExperimentalLspKlibs);$(_DotKtxExperimentalLspSources);@(_DotKtxExperimentalLspKlib)"
+          Inputs="$(_DotKtxExperimentalLspTool);$(_DotKtxExperimentalLspBuiltins);@(_DotKtxExperimentalLspStdlibKlib);$(MSBuildProjectFullPath);$(_DotKtxExperimentalLspKlibs);$(_DotKtxExperimentalLspSources);$(_DotKtxExperimentalLspPolicy);@(_DotKtxExperimentalLspKlib)"
           Outputs="$(_DotKtxExperimentalLspStamp);$(MSBuildProjectDirectory)/workspace.json"
           Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
+    <PropertyGroup>
+      <_DotKtxExperimentalLspJavaProjectionArgument Condition="'$(DotKtxExperimentalLspJavaProjection)' != ''"> --java-projection &quot;$(DotKtxExperimentalLspJavaProjection)&quot;</_DotKtxExperimentalLspJavaProjectionArgument>
+    </PropertyGroup>
     <Message Importance="high" Text="DotKtx.Experimental.LspSupport: generating analysis workspace from @(_DotKtxExperimentalLspKlib->Count()) KLIB(s)" />
-    <Exec Command="dotnet &quot;$(_DotKtxExperimentalLspTool)&quot; generate --project &quot;$(MSBuildProjectDirectory)&quot; --name &quot;$(MSBuildProjectName)&quot; --output &quot;$(DotKtxExperimentalLspRoot)&quot; --sources &quot;$(_DotKtxExperimentalLspSources)&quot; --klibs &quot;$(_DotKtxExperimentalLspKlibs)&quot; --stdlib &quot;$(_DotKtxExperimentalLspStdlib)&quot; --overlay &quot;$(_DotKtxExperimentalLspOverlay)&quot;" />
+    <Exec Command="dotnet &quot;$(_DotKtxExperimentalLspTool)&quot; generate --project &quot;$(MSBuildProjectDirectory)&quot; --name &quot;$(MSBuildProjectName)&quot; --output &quot;$(DotKtxExperimentalLspRoot)&quot; --sources &quot;$(_DotKtxExperimentalLspSources)&quot; --klibs &quot;$(_DotKtxExperimentalLspKlibs)&quot; --builtins &quot;$(_DotKtxExperimentalLspBuiltins)&quot; --stdlib-klib &quot;@(_DotKtxExperimentalLspStdlibKlib)&quot;$(_DotKtxExperimentalLspJavaProjectionArgument)" />
   </Target>
 
   <Target Name="DotKtxCleanExperimentalLspWorkspace"

@@ -1,0 +1,248 @@
+// Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+// Licensed under the Apache License, Version 2.0.
+//
+// Authoring subset of the payload carried by the JVM `kotlin.Metadata` annotation:
+//   core/metadata/src/metadata.proto
+//   core/metadata.jvm/src/jvm_metadata.proto
+//
+// The core messages are the same schema family as KlibMetadata.proto, but the two are kept apart on
+// purpose: an index means different things in each. In a KLIB a class is named through the qualified
+// name table, whereas here every name is an index into the annotation's own string table and a class
+// is spelled `System/Text/StringBuilder.ChunkEnumerator`.
+//
+// The JVM extensions are upstream protobuf extensions. Declaring their numbers as ordinary fields
+// produces the identical wire representation, and Kotlin's registered extension parser sees them.
+//
+// Every field number here was read off metadata emitted by the real Kotlin 2.4.0 compiler rather than
+// recalled: see docs for the wire dumps this schema was derived from.
+syntax = "proto2";
+package dotkt.jvm;
+option csharp_namespace = "DotKt.Jvm.Metadata";
+
+// --- jvm_metadata.proto -----------------------------------------------------------------------
+
+// Resolution rules for the annotation's string table. One record covers `range` consecutive indices.
+// Emitting a single default record of the full range makes every index resolve to its literal string.
+message StringTableTypes {
+  message Record {
+    enum Operation {
+      NONE = 0;
+      INTERNAL_TO_CLASS_ID = 1;
+      DESUGARED_COLLECTION = 2;
+    }
+    optional int32 range = 1 [default = 1];
+    optional int32 predefined_index = 2;
+    optional Operation operation = 3 [default = NONE];
+    repeated int32 substring_index = 4 [packed = true];
+    repeated int32 replace_char = 5 [packed = true];
+    optional string string = 6;
+  }
+  repeated Record record = 1;
+  repeated int32 local_name = 5 [packed = true];
+}
+
+message JvmMethodSignature {
+  optional int32 name = 1;
+  optional int32 desc = 2;
+}
+
+message JvmFieldSignature {
+  optional int32 name = 1;
+  optional int32 desc = 2;
+}
+
+message JvmPropertySignature {
+  optional JvmFieldSignature field = 1;
+  optional JvmMethodSignature synthetic_method = 2;
+  optional JvmMethodSignature getter = 3;
+  optional JvmMethodSignature setter = 4;
+  optional JvmMethodSignature delegate_method = 5;
+}
+
+// --- metadata.proto ---------------------------------------------------------------------------
+
+message Annotation {
+  message Argument {
+    message Value {
+      enum Type {
+        BYTE = 0;
+        CHAR = 1;
+        SHORT = 2;
+        INT = 3;
+        LONG = 4;
+        FLOAT = 5;
+        DOUBLE = 6;
+        BOOLEAN = 7;
+        STRING = 8;
+        CLASS = 9;
+        ENUM = 10;
+        ANNOTATION = 11;
+        ARRAY = 12;
+      }
+      optional Type type = 1;
+      optional sint64 int_value = 2;
+      optional float float_value = 3;
+      optional double double_value = 4;
+      optional int32 string_value = 5;
+      optional int32 class_id = 6;
+      optional int32 enum_value_id = 7;
+      optional Annotation annotation = 8;
+      repeated Value array_element = 9;
+      optional int32 flags = 10;
+      optional int32 array_dimension_count = 11 [default = 0];
+    }
+    required int32 name_id = 1;
+    required Value value = 2;
+  }
+  required int32 id = 1;
+  repeated Argument argument = 2;
+}
+
+message Type {
+  message Argument {
+    enum Projection { IN = 0; OUT = 1; INV = 2; STAR = 3; }
+    optional Projection projection = 1 [default = INV];
+    optional Type type = 2;
+    optional int32 type_id = 3;
+  }
+  optional int32 flags = 1;
+  repeated Argument argument = 2;
+  optional bool nullable = 3 [default = false];
+  // Set to the index of "kotlin.jvm.PlatformType" together with flexible_upper_bound to write the
+  // CLR platform type `String!`, which is the whole reason this representation exists.
+  optional int32 flexible_type_capabilities_id = 4;
+  optional Type flexible_upper_bound = 5;
+  optional int32 class_name = 6;
+  optional int32 type_parameter = 7;
+  optional int32 flexible_upper_bound_id = 8;
+  optional int32 type_parameter_name = 9;
+  optional int32 type_alias_name = 10;
+  optional Type outer_type = 11;
+  optional int32 outer_type_id = 12;
+  optional Type abbreviated_type = 13;
+  optional int32 abbreviated_type_id = 14;
+  repeated Annotation type_annotation = 100;
+  optional bool is_raw = 101;
+}
+
+message TypeParameter {
+  enum Variance { IN = 0; OUT = 1; INV = 2; }
+  required int32 id = 1;
+  required int32 name = 2;
+  optional bool reified = 3 [default = false];
+  optional Variance variance = 4 [default = INV];
+  repeated Type upper_bound = 5;
+  repeated int32 upper_bound_id = 6 [packed = true];
+}
+
+message ValueParameter {
+  optional int32 flags = 1 [default = 0];
+  required int32 name = 2;
+  optional Type type = 3;
+  optional Type vararg_element_type = 4;
+  optional int32 type_id = 5;
+  optional int32 vararg_element_type_id = 6;
+}
+
+message Constructor {
+  optional int32 flags = 1 [default = 6];
+  repeated ValueParameter value_parameter = 2;
+  repeated int32 version_requirement = 31 [packed = true];
+  optional JvmMethodSignature jvm_signature = 100;
+}
+
+message Function {
+  optional int32 old_flags = 1 [default = 6];
+  required int32 name = 2;
+  optional Type return_type = 3;
+  repeated TypeParameter type_parameter = 4;
+  optional Type receiver_type = 5;
+  repeated ValueParameter value_parameter = 6;
+  optional int32 return_type_id = 7;
+  optional int32 receiver_type_id = 8;
+  optional int32 flags = 9;
+  repeated ValueParameter context_parameter = 13;
+  repeated int32 version_requirement = 31 [packed = true];
+  optional JvmMethodSignature jvm_signature = 100;
+}
+
+message Property {
+  optional int32 old_flags = 1 [default = 2054];
+  required int32 name = 2;
+  optional Type return_type = 3;
+  repeated TypeParameter type_parameter = 4;
+  optional Type receiver_type = 5;
+  optional ValueParameter setter_value_parameter = 6;
+  optional int32 getter_flags = 7;
+  optional int32 setter_flags = 8;
+  optional int32 return_type_id = 9;
+  optional int32 receiver_type_id = 10;
+  optional int32 flags = 11;
+  repeated ValueParameter context_parameter = 17;
+  repeated int32 version_requirement = 31 [packed = true];
+  optional JvmPropertySignature jvm_signature = 100;
+}
+
+message EnumEntry {
+  optional int32 name = 1;
+}
+
+message Class {
+  optional int32 flags = 1 [default = 6];
+  required int32 fq_name = 3;
+  optional int32 companion_object_name = 4;
+  repeated TypeParameter type_parameter = 5;
+  repeated Type supertype = 6;
+  repeated int32 nested_class_name = 7 [packed = true];
+  repeated Constructor constructor = 8;
+  repeated Function function = 9;
+  repeated Property property = 10;
+  repeated EnumEntry enum_entry = 13;
+  repeated int32 supertype_id = 14 [packed = true];
+  repeated int32 sealed_subclass_fq_name = 16 [packed = true];
+  optional int32 inline_class_underlying_property_name = 17;
+  optional Type inline_class_underlying_type = 18;
+  optional int32 inline_class_underlying_type_id = 19;
+  repeated int32 version_requirement = 31 [packed = true];
+  optional int32 jvm_module_name = 101;
+  optional int32 jvm_class_flags = 104;
+}
+
+message Package {
+  repeated Function function = 3;
+  repeated Property property = 4;
+  optional int32 jvm_module_name = 101;
+}
+
+// --- module_mapping (META-INF/<module>.kotlin_module) ------------------------------------------
+//
+// Top-level declarations live on synthetic facade classes whose names cannot be derived from a
+// package name, so a Kotlin analyzer only finds them through this mapping. The file is a bare
+// protobuf preceded by the metadata version as big-endian int32s.
+
+message PackageParts {
+  required string package_fqn = 1;
+  repeated string class_name = 2;
+  repeated int32 multifile_facade_id = 3 [packed = true];
+  repeated string class_with_jvm_package_name_name = 4;
+  repeated int32 class_with_jvm_package_name_multifile_facade_id = 5 [packed = true];
+  repeated string class_with_jvm_package_name_package_id = 6;
+}
+
+message Module {
+  repeated PackageParts package_parts = 1;
+  repeated PackageParts metadata_parts = 2;
+  // Emitted empty, matching what the Kotlin compiler writes for a module with no annotations.
+  optional StringTableTypes string_table = 4;
+  optional QualifiedNameTable qualified_names = 5;
+}
+
+message QualifiedNameTable {
+  message QualifiedName {
+    enum Kind { CLASS = 0; PACKAGE = 1; LOCAL = 2; }
+    optional int32 parent_qualified_name = 1 [default = -1];
+    required int32 short_name = 2;
+    optional Kind kind = 3 [default = PACKAGE];
+  }
+  repeated QualifiedName qualified_name = 1;
+}

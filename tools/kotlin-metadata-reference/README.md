@@ -15,8 +15,8 @@ lands so the companion projection can be re-measured rather than assumed.
 
 ```bash
 repo=$(git rev-parse --show-toplevel)
-LIB="$repo/artifacts/.packages/dotkt.toolchain/0.9.8/tools/kotc/lib"
-CP="$LIB/kotlin-compiler-embeddable-2.4.0.jar:$LIB/kotlin-stdlib-2.4.0.jar:."
+LIB="$repo/artifacts/.packages/dotkt.toolchain/0.9.13-beta2/tools/kotc/lib"
+CP="$LIB/kotlin-compiler-embeddable-2.4.10.jar:$LIB/kotlin-stdlib-2.4.10.jar:."
 cd "$repo/tools/kotlin-metadata-reference"
 mkdir -p out   # gitignored scratch for compiled classes and dumps
 javac -cp "$CP" -d . MetaTool.java MetaDump.java MapTool.java
@@ -71,7 +71,7 @@ represents a construct.
 
 ```bash
 java -cp "$LIB/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
-  -no-stdlib -classpath "$LIB/kotlin-stdlib-2.4.0.jar" -d out probes/Rich.kt
+  -no-stdlib -classpath "$LIB/kotlin-stdlib-2.4.10.jar" -d out probes/Rich.kt
 ```
 
 - `Rich.kt` - generics with bounds, an interface with a default method, default and vararg arguments,

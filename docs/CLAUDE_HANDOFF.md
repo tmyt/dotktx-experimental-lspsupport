@@ -1,11 +1,11 @@
 # DotKtx.Experimental.LspSupport 引継ぎ
 
-対象: DotKt 0.9.9 / Kotlin 2.4.0
-最終更新: 2026-08-11 (第3版、DotKt 0.9.9 で再ベースライン)
+対象: DotKt 0.9.13-beta2 / Kotlin 2.4.10
+最終更新: 2026-10-12 (第4版、DotKt 0.9.13-beta2 で再ベースライン)
 
-この文書の数値はすべて DotKt 0.9.9 で生成した `tests/Smoke/.dotkt/lsp/projection-report.md` を
-authority としている。第2版までの数値（source stub 併用、metadata 未実装、companion 重複前提）は
-すべて過去のものなので参照しないこと。
+この文書の現在値は DotKt 0.9.13-beta2 で生成した
+`tests/Smoke/.dotkt/lsp/projection-report.md` を authority としている。0.9.9 以前の数値は比較用の
+履歴であり、現状値として参照しないこと。
 
 ## 1. 現在の状態
 
@@ -29,7 +29,7 @@ Java メンバは参照されない。これにより plain Java classfile で�
 | top-level 関数・プロパティ | file facade class + `META-INF/dotkt_clr.kotlin_module` |
 | CLR enum | JVM enum (`ACC_ENUM` + `Signature: Ljava/lang/Enum<Self>;`) |
 | CLR attribute | JVM annotation interface + metadata の constructor |
-| CLR static | owner 直下の `ACC_STATIC` メンバ（0.9.9 の companion block と同形） |
+| CLR static | owner 直下の `ACC_STATIC` メンバ（companion block と同形） |
 | extension property | receiver を引数に取る accessor メソッド + metadata の `receiver_type` |
 | context parameter | 先頭の引数 + metadata の `context_parameter` |
 | Kotlin 標準ライブラリ | DotKt 自身の CLR stdlib KLIB を同じ経路で投影 |
@@ -38,10 +38,9 @@ Java メンバは参照されない。これにより plain Java classfile で�
 
 ```text
 DotKt MSBuild (public contract)
-  DotKtPrepareFrontendInputs
-        ├─ @(DotKtReferenceKlib) ────────────────┐
-        └─ @(DotKtFrontendKlib) Role=StandardLibrary
-                                (CLR stdlib KLIB) ┤
+  DotKtResolveKlibReferences
+        ├─ @(DotKtResolvedKlibReference) ─────────┐
+        └─ $(DotKtStdlib) (CLR stdlib KLIB) ──────┤
   @(KotlinCompile) ───────────────────────────────┤
                                                   v
                         KlibReader (KLIB を1回だけ読む)
@@ -77,20 +76,20 @@ workspace.json
 `.dotkt/**/*.kt` は `@(KotlinCompile)` から除外される。生成物が CLR assembly へ混入しないことは
 この package の最重要 boundary である。
 
-## 2. DotKt 0.9.9 への追従
+## 2. DotKt 0.9.13-beta2 への追従
 
-0.9.9 は MSBuild 統合契約を公開した（`DotKt.README.md` に明記）。
+0.9.13-beta2 の MSBuild 統合契約は `DotKt.README.md` に明記されている。
 
-- target `DotKtPrepareFrontendInputs` の完了後、
-- `@(DotKtReferenceKlib)` に全参照 KLIB（identity が KLIB パス、`SourceAssembly` メタ付き）、
-- `@(DotKtFrontendKlib)` に frontend classpath 全体（`Role` = `StandardLibrary` / `Reference`）、
+- target `DotKtResolveKlibReferences` の完了後、
+- `@(DotKtResolvedKlibReference)` に全参照 KLIB（絶対 KLIB パス、`SourceAssembly` / TFM / RID メタ付き）、
+- `$(DotKtStdlib)` に評価時から CLR frontend stdlib KLIB のパス、
 - `$(DotKtKotlinVersion)` に埋め込み Kotlin バージョン。
 - `_DotKt` 接頭辞と `$(DotKtToolchainDir)` 配下は private。
 
 `packaging/build/DotKtx.Experimental.LspSupport.targets` はこの公開契約だけを使っている。
-private 名（旧 `@(_DotKtKlibReference)`、`DotKtGenerateReferenceKlibs` 等）への依存は残っていない。
+private 名（`@(_DotKtKlibReference)`、`DotKtGenerateReferenceKlibs` 等）への依存は無い。
 
-`@(DotKtFrontendKlib)` の `Role=StandardLibrary`（`kotlin-stdlib-clr-frontend.klib`）も投影している。
+`$(DotKtStdlib)` の `kotlin-stdlib-clr-frontend.klib` も投影している。
 これにより JVM `kotlin-stdlib.jar` 近似と手書き overlay を**廃止した**。`kotlin.clr` は DotKt 自身の
 宣言から来るので、手動メンテは不要になった。
 
@@ -115,7 +114,7 @@ generator:
 - `KlibReader.cs` — KLIB ZIP + protobuf を1回だけ読む。`NameResolver` もここ。
 - `KlibMetadata.proto` — KLIB `.knm` の読み取り schema。
 - `JvmMetadata.proto` — JVM `kotlin.Metadata` の書き出し schema と `.kotlin_module`。
-  **全フィールド番号は実際の Kotlin 2.4.0 コンパイラ出力から読み取ったもの**（7章）。
+  **全フィールド番号は実際の Kotlin コンパイラ出力から読み取ったもの**（7章）。
 - `KotlinMetadata.cs` — `BitEncoding`、文字列表、metadata writer、module mapping writer。
 - `KlibJavaStubProjector.cs` — 投影対象選択、facade 生成、JAR 作成、`JavaEmitContext`（名前解決・
   descriptor・generic signature・erasure・Kotlin builtin 対応）。
@@ -134,7 +133,7 @@ generator:
 - `verify.sh` — pack、isolated restore、DotKt build、JAR 構造検査、会計検査、fallback 経路検査。
 - `tools/kotlin-metadata-reference/` — metadata 形式を実物から導出・検証する開発用ツール（7章）。
 
-## 4. DotKt 0.9.9 実測値
+## 4. DotKt 0.9.13-beta2 実測値
 
 Smoke project、参照 KLIB 167 本。
 
@@ -144,13 +143,13 @@ Smoke project、参照 KLIB 167 本。
 
 | 宣言 | KLIB | JAR | 差 |
 |---|---:|---:|---:|
-| class | 4359 | 4359 | 0 |
-| function | 37493 | 37493 | 0 |
-| property | 11552 | 11552 | 0 |
-| constructor | 4597 | 4418 | **-179** |
-| enum entry | 5215 | 5215 | 0 |
-| top-level function | 8461 | 8461 | 0 |
-| top-level property | 109 | 109 | 0 |
+| class | 4405 | 4405 | 0 |
+| function | 39531 | 39531 | 0 |
+| property | 11637 | 11637 | 0 |
+| constructor | 4470 | 4291 | **-179** |
+| enum entry | 5232 | 5232 | 0 |
+| top-level function | 6760 | 6760 | 0 |
+| top-level property | 112 | 112 | 0 |
 
 builtin classifier 134 個は `input.builtin-class` に分離してある（classfile ではなく
 `*.kotlin_builtins` から供給されるため）。
@@ -163,25 +162,30 @@ constructor 以外の差が 0 でなければ失敗し、constructor の差も�
 
 ### 4.2 出力
 
-- JAR: 4,503 class（うち file facade 144）+ `META-INF/dotkt_clr.kotlin_module`、13 MiB
+- JAR: 4,473 class（うち file facade 68）+ `META-INF/dotkt_clr.kotlin_module`
 - Kotlin source: **0 file**
-- metadata: 4,503 class
-- 生成時間: KLIB read 約 1.0 s / Java projection 約 1.4 s / 合計 約 2.4 s
-- NuGet package: 471 KB（0.9.8 時代は 2.2 MB。1.8 MB の JVM stdlib が 17 KB の builtins になった）
+- metadata: 4,473 class
+- 生成時間: KLIB read 0.94 s / Java projection 1.28 s / 合計 2.26 s
+- NuGet package: 約 1.1 MB（PDB を含む）。JVM stdlib 全体ではなく約 17 KB の builtins JAR だけを同梱。
 
 ### 4.3 実 LSP
 
 ```text
-cold index + assertion 10 本完走: 34.8s  (開始時 1分 load average 0.8)
+cold index + assertion 10 本完走: 17.1s  (開始時 load 0.8、終了時 1.3)
 ```
 
-verifier は負荷平均を併記する。**load が ~1.0 を超えた測定値は比較に使えない**（同一構成で 66〜125 秒に
-ばらついた実績がある）。上記は load 0.8 で取得した有効値。
+verifier は負荷平均を併記する。**load が ~1.0 を超えた測定値は比較に使えない**。上記は機能検証時の
+参考値であり、終了時に 1.3 まで上がったため厳密な性能比較値ではない。
+
+使用 LSP は JetBrains 公式 standalone `v263.6379.0`（VS Code extension 0.0.13 と同世代）。
 
 assertion: `kotlin.clr` 補完 / import 補完 / member 補完 / static 補完 / 継承補完 / **CLR enum 補完** /
 generic hover / interface definition / definition navigation / metadata hover。
 
 ## 5. 0.9.8 → 0.9.9 で解消した upstream gap
+
+この章は移行履歴。5.2 の後続修正は 0.9.13-beta2 に取り込まれており、現在の report に
+`## upstream gaps` セクションは無い。
 
 第2版で「upstream 依存で手が出せない」と分類した 5 件のうち **4 件が 0.9.9 で解消**した。
 
@@ -247,7 +251,7 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 
 ### 6.1 upstream gap
 
-リリース版 0.9.9 では 1 件（幻パッケージ複製、5.2）。**dll2klib の後続修正を当てると 0 件**になる。
+**0 件。** 0.9.9 で残っていた幻パッケージ複製（5.2）は 0.9.13-beta2 で解消済み。
 
 ### 6.2 representation limit（Kotlin 側の原理的制約、誰にも直せない）1 件
 
@@ -312,8 +316,8 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 
 - CLR attribute の constructor overload（6.2）。Kotlin の言語仕様上、誰にも直せない。
 
-拡張メソッドの幻パッケージ複製は dll2klib の後続修正で解消済み（5.2）。その修正を含む
-toolchain がリリースされれば、リリース版でも upstream gap は 0 になる。
+拡張メソッドの幻パッケージ複製は dll2klib の後続修正で解消され、その修正は
+0.9.13-beta2 に含まれている（5.2）。現在の upstream gap は 0。
 
 将来の改善候補（欠陥ではない）:
 
@@ -355,8 +359,8 @@ cold index 1 回で 400 MiB を超える。verifier は既定で `tests/Smoke/.d
 - `workspace.json` がこの package 所有でない場合は上書きしない保護を維持する。
 - 生成物を `KotlinCompile` に混ぜない。
 - 解析 JAR の API は editor approximation であり、compiler diagnostics より優先しない。
-- `Directory.Build.props` の `DotKtVersion` / `DotKtKotlinVersion` を変えたら overlay と
-  metadata version を見直す。package の `VersionPrefix` は対象 DotKt リリースに揃えている。
+- `Directory.Build.props` の `DotKtVersion` / `DotKtKotlinVersion` を変えたら metadata version、
+  builtins 抽出元、7章の参照ベクトルを見直す。package version は対象 DotKt リリースに揃えている。
 - nested `./kotlin-lsp` を外側 repo へ誤って追加しない。
 - installed VS Code extension の JAR を直接変更した状態で結果を確定しない。
 
@@ -370,5 +374,5 @@ node tests/Smoke/verify-lsp.mjs
 cat tests/Smoke/.dotkt/lsp/projection-report.md
 ```
 
-report の `## upstream gaps` と `## representation limits` が現在の損失の全体である。
-それ以外に黙って落ちているものは無い（会計表が検査している）。
+report の `## upstream gaps` と `## representation limits`（0件の章は出力されない）が現在の損失の
+全体である。それ以外に黙って落ちているものは無い（会計表が検査している）。

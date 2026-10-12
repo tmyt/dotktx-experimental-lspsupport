@@ -1,7 +1,7 @@
 // Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
 // Licensed under the Apache License, Version 2.0.
 //
-// Wire-compatible dll2klib authoring subset of Kotlin 2.4.0's:
+// Wire-compatible dll2klib authoring subset, rechecked against Kotlin 2.4.10's:
 //   core/metadata/src/metadata.proto
 //   compiler/util-klib/src/KlibMetadataProtoBuf.proto
 //

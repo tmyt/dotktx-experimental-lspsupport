@@ -6,8 +6,8 @@ projects with JetBrains' Kotlin language server.
 The official language server cannot currently load DotKt's frontend KLIBs.
 This package adds an incremental MSBuild target that:
 
-1. depends on DotKt's public `DotKtPrepareFrontendInputs` target and reads the
-   reference KLIB set it publishes as `@(DotKtReferenceKlib)`;
+1. depends on DotKt's public `DotKtResolveKlibReferences` target and reads the
+   reference KLIB set it publishes as `@(DotKtResolvedKlibReference)`;
 2. projects every referenced CLR declaration into an analysis-only JAR whose
    classfiles carry the Kotlin metadata they were declared with;
 3. projects DotKt's own CLR standard library the same way, so `kotlin.clr` and the
@@ -27,7 +27,7 @@ Add the package as a private, build-only dependency:
 <ItemGroup>
   <PackageReference
     Include="DotKtx.Experimental.LspSupport"
-    Version="0.9.9"
+    Version="0.9.13-beta2"
     PrivateAssets="all"
     IncludeAssets="build" />
 </ItemGroup>
@@ -81,8 +81,8 @@ package.
 ## Analysis model and known approximations
 
 JetBrains LSP cannot consume a KLIB directly, so DotKt's standard library is
-projected into the same analysis JAR as the CLR references. DotKt 0.9.9 publishes
-it as the `StandardLibrary` entry of `@(DotKtFrontendKlib)`. `kotlin.clr` -
+projected into the same analysis JAR as the CLR references. DotKt 0.9.13-beta2
+publishes its path as `$(DotKtStdlib)`. `kotlin.clr` -
 `ClrRef`, `byref`, `StackBuffer`, `Span`, `stackBuffer`, `ClrEvent`, `clrEvent`,
 `EventSubscription` and the rest - therefore comes from DotKt itself and needs no
 hand-maintained overlay, and JVM-only APIs such as `kotlin.concurrent.thread` or
@@ -98,7 +98,7 @@ instead of an approximation of it. Overloads that collide after JVM erasure keep
 both declarations: the Kotlin name lives in the metadata and only the JVM name
 is mangled.
 
-This is what makes DotKt 0.9.9's nullability visible. That release annotates the
+This is what makes DotKt 0.9.13-beta2's nullability visible. That release annotates the
 KLIB from the CLR's own nullable metadata, so `Exception.InnerException` arrives
 as `Exception?` and `Exception.Message` as a non-null `String`, and only members
 from assemblies without nullable annotations stay platform types. A plain Java
@@ -130,14 +130,16 @@ members become that single parameter list and the overloads it could not express
 are counted.
 
 The report separates what it lost into two kinds. *Upstream gaps* are absences in
-the KLIB itself; against DotKt 0.9.9 the only one left is a C# extension method
-arriving twice, as a static of its declaring class and as a package top-level, so
-the editor offers one CLR method under two declarations. *Representation limits*
-are constructs Kotlin has no shape for at all. Neither is silent.
+the KLIB itself; none are reported against DotKt 0.9.13-beta2. *Representation
+limits* are constructs Kotlin has no shape for at all. The remaining limit is CLR
+attribute constructor overloads, because a Kotlin annotation class has exactly one
+constructor. Neither category is silent. C# extension methods remain callable both
+as declaring-class statics and as Kotlin extensions; the report counts that shape,
+but it is not a loss or duplicate within one completion scope.
 
-JVM-only stdlib APIs can appear in completion even when DotKt does not implement
-them. The analysis JARs are editor inputs only and must not be used as DotKt
-compiler or runtime inputs.
+JVM-only stdlib APIs do not appear because the standard library declarations come
+from DotKt's CLR KLIB. The analysis JARs are editor inputs only and must not be used
+as DotKt compiler or runtime inputs.
 
 The generated workspace also enables
 `-XXLanguage:+CompanionBlocksAndExtensions` for LSP analysis. DotKt provides
@@ -152,7 +154,7 @@ the corresponding language flag explicitly.
 node tests/Smoke/verify-lsp.mjs
 ```
 
-This packs the NuGet package, restores the smoke project against DotKt 0.9.9,
+This packs the NuGet package, restores the smoke project against DotKt 0.9.13-beta2,
 and verifies that an ordinary `dotnet build` generated `workspace.json`, the
 analysis libraries, and a `System.Text.StringBuilder` completion declaration.
 The Node verifier additionally starts an installed JetBrains Kotlin language

@@ -166,10 +166,11 @@ child.stdout.on("data", chunk => {
     }
 })
 
+let terminationRequested = false
 const childExit = new Promise((resolvePromise, rejectPromise) => {
     child.once("error", rejectPromise)
     child.once("exit", (code, signal) => {
-        if (code === 0 || signal === "SIGTERM") resolvePromise()
+        if (code === 0 || (terminationRequested && (code === 143 || signal === "SIGTERM"))) resolvePromise()
         else rejectPromise(new Error(`Kotlin LSP exited: code=${code}, signal=${signal}`))
     })
 })
@@ -440,8 +441,20 @@ try {
 
     await request("shutdown", null, 30_000)
     notify("exit")
-    await childExit
+    const exitedAfterNotification = await Promise.race([
+        childExit.then(() => true),
+        new Promise(resolvePromise => setTimeout(() => resolvePromise(false), 5_000)),
+    ])
+    // Recent standalone servers can leave the native launcher alive after the LSP endpoint has
+    // acknowledged shutdown and received exit. The assertions are complete at that point; do not
+    // leave CI waiting on a wrapper process indefinitely.
+    if (!exitedAfterNotification) {
+        terminationRequested = true
+        child.kill("SIGTERM")
+        await childExit
+    }
 } catch (error) {
+    terminationRequested = true
     child.kill("SIGTERM")
     await childExit.catch(() => {})
     throw error

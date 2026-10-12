@@ -13,8 +13,9 @@
 // The JVM extensions are upstream protobuf extensions. Declaring their numbers as ordinary fields
 // produces the identical wire representation, and Kotlin's registered extension parser sees them.
 //
-// Every field number here was read off metadata emitted by the real Kotlin 2.4.0 compiler rather than
-// recalled: see docs for the wire dumps this schema was derived from.
+// Every field number here was read off metadata emitted by the real Kotlin compiler rather than
+// recalled, and was rechecked against Kotlin 2.4.10: see docs for the wire dumps this schema was
+// derived from.
 syntax = "proto2";
 package dotkt.jvm;
 option csharp_namespace = "DotKt.Jvm.Metadata";

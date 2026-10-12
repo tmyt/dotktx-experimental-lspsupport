@@ -53,11 +53,11 @@ for entry in \
   'System/Text/UTF8Encoding.class'; do
   jar tf "$java_stub_jar" | grep -Fqx "$entry"
 done
-# DotKt 0.9.9 emits CLR statics as members of their own type instead of duplicating them onto a
+# DotKt emits CLR statics as members of their own type instead of duplicating them onto a
 # synthetic companion. Kotlin's own standard library still has real companions (`UInt.Companion`),
 # so only a companion on a CLR type indicates the old duplication has come back.
 if jar tf "$java_stub_jar" | grep 'Companion' | grep -qv '^kotlin/'; then
-  echo "A companion class was projected for a CLR type; DotKt 0.9.9 should not declare one" >&2
+  echo "A companion class was projected for a CLR type; current DotKt should not declare one" >&2
   jar tf "$java_stub_jar" | grep 'Companion' | grep -v '^kotlin/' | head -5 >&2
   exit 1
 fi
@@ -155,6 +155,11 @@ javap -classpath "$java_stub_jar" System.Linq.System_Linq_ParallelKt | grep -q '
 # A C# extension method is callable as a static of its class and as an extension; both forms are
 # declared and both are emitted, in different scopes. Counted so the shape stays visible.
 rg -q '^- extension-method\.both-call-forms: [1-9]' "$report"
+if rg -q '^## upstream gaps$' "$report"; then
+  echo "DotKt 0.9.13-beta2 left an upstream KLIB gap:" >&2
+  sed -n '/^## upstream gaps$/,/^## /p' "$report" >&2
+  exit 1
+fi
 if rg -q '^- member\.dropped\.' "$report"; then
   echo "The projection dropped members that the metadata representation can carry:" >&2
   rg '^- member\.dropped\.' "$report" >&2

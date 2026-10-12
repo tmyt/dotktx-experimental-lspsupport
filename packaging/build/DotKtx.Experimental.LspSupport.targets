@@ -12,19 +12,17 @@
   </PropertyGroup>
 
   <Target Name="DotKtxWriteExperimentalLspInputs"
-          DependsOnTargets="DotKtPrepareFrontendInputs"
+          DependsOnTargets="DotKtResolveKlibReferences"
           Condition="'$(DotKtxExperimentalLspSupportEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
     <ItemGroup>
       <!-- NuGet .props are imported before some SDK default items. Enforce the boundary again here,
            immediately before both projection and KotlinCompile consume @(KotlinCompile). -->
       <KotlinCompile Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
       <UpToDateCheckInput Remove="$(_DotKtxExperimentalLspRelativeRoot)/**/*.kt;$(DotKtxExperimentalLspRoot)/**/*.kt" />
-      <!-- DotKt 0.9.9 publishes both halves of the frontend classpath. The reference KLIBs carry the
-           CLR assemblies; the StandardLibrary entry is DotKt's own Kotlin stdlib, and projecting it is
+      <!-- DotKt publishes reference KLIBs separately from its frontend stdlib. Projecting both is
            what keeps JVM-only stdlib APIs out of the editor. -->
-      <_DotKtxExperimentalLspKlib Include="@(DotKtReferenceKlib)" />
-      <_DotKtxExperimentalLspStdlibKlib Include="@(DotKtFrontendKlib)"
-                                        Condition="'%(DotKtFrontendKlib.Role)' == 'StandardLibrary'" />
+      <_DotKtxExperimentalLspKlib Include="@(DotKtResolvedKlibReference)" />
+      <_DotKtxExperimentalLspStdlibKlib Include="$(DotKtStdlib)" />
     </ItemGroup>
     <WriteLinesToFile File="$(_DotKtxExperimentalLspKlibs)"
                       Lines="@(_DotKtxExperimentalLspKlib->'%(FullPath)')"

@@ -8,7 +8,7 @@
     <readme>README.md</readme>
     <projectUrl>https://github.com/tmyt/dotktx-experimental-lspsupport</projectUrl>
     <repository type="git" url="https://github.com/tmyt/dotktx-experimental-lspsupport.git" />
-    <description>Experimental JetBrains Kotlin LSP workspace projection for DotKt projects. Projects the CLR reference KLIBs into a single analysis-only JAR whose classfiles carry the same kotlin.Metadata a compiled Kotlin library would, so the editor reads the CLR API as declared. The Kotlin standard library, including kotlin.clr, is projected from DotKt's own CLR standard library KLIB, so no JVM-only stdlib API reaches completion. Targets DotKt 0.9.13-beta2.</description>
+    <description>Experimental JetBrains Kotlin LSP workspace projection for DotKt projects. Projects the CLR reference KLIBs into a single analysis-only JAR whose classfiles carry the same kotlin.Metadata a compiled Kotlin library would, so the editor reads the CLR API as declared. The Kotlin standard library, including kotlin.clr, is projected from DotKt's own CLR standard library KLIB, so no JVM-only stdlib API reaches completion. Targets DotKt 0.9.14.</description>
     <tags>dotkt kotlin clr lsp vscode experimental</tags>
   </metadata>
   <files>

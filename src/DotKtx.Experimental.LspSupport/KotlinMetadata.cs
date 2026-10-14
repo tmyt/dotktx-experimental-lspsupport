@@ -22,7 +22,7 @@ internal sealed record KotlinMetadataAnnotation(
 /// <summary>
 /// Encodes the metadata payload the way <c>kotlin.Metadata.d1</c> expects: a marker char followed by
 /// one char per byte, split into chunks a constant-pool UTF-8 entry can hold. Verified against the
-/// Kotlin 2.4.10 reference implementation on generated vectors.
+/// Kotlin 2.4.21 reference implementation on generated vectors.
 /// </summary>
 internal static class BitEncoding
 {
@@ -417,11 +417,11 @@ internal sealed class KotlinMetadataWriter(JavaEmitContext context)
         var configured = typeof(KotlinMetadataWriter).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
             .FirstOrDefault(attribute => attribute.Key == "DotKtKotlinVersion")?.Value;
-        var parts = (configured ?? "2.4.10").Split('.');
+        var parts = (configured ?? "2.4.21").Split('.');
         return [
             parts.Length > 0 && int.TryParse(parts[0], out var major) ? major : 2,
             parts.Length > 1 && int.TryParse(parts[1], out var minor) ? minor : 4,
-            parts.Length > 2 && int.TryParse(parts[2], out var patch) ? patch : 10,
+            parts.Length > 2 && int.TryParse(parts[2], out var patch) ? patch : 21,
         ];
     }
 

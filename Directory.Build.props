@@ -1,10 +1,10 @@
 <Project>
   <PropertyGroup>
-    <VersionPrefix>0.9.13</VersionPrefix>
-    <VersionSuffix>beta2</VersionSuffix>
+    <VersionPrefix>0.9.14</VersionPrefix>
+    <VersionSuffix></VersionSuffix>
     <!-- The analysis JAR metadata must match this DotKt/Kotlin release pair. -->
-    <DotKtVersion>0.9.13-beta2</DotKtVersion>
-    <DotKtKotlinVersion>2.4.10</DotKtKotlinVersion>
+    <DotKtVersion>0.9.14</DotKtVersion>
+    <DotKtKotlinVersion>2.4.21</DotKtKotlinVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

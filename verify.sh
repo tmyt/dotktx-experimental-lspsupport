@@ -156,7 +156,7 @@ javap -classpath "$java_stub_jar" System.Linq.System_Linq_ParallelKt | grep -q '
 # declared and both are emitted, in different scopes. Counted so the shape stays visible.
 rg -q '^- extension-method\.both-call-forms: [1-9]' "$report"
 if rg -q '^## upstream gaps$' "$report"; then
-  echo "DotKt 0.9.13-beta2 left an upstream KLIB gap:" >&2
+  echo "DotKt 0.9.14 left an upstream KLIB gap:" >&2
   sed -n '/^## upstream gaps$/,/^## /p' "$report" >&2
   exit 1
 fi

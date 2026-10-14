@@ -27,7 +27,7 @@ Add the package as a private, build-only dependency:
 <ItemGroup>
   <PackageReference
     Include="DotKtx.Experimental.LspSupport"
-    Version="0.9.13-beta2"
+    Version="0.9.14"
     PrivateAssets="all"
     IncludeAssets="build" />
 </ItemGroup>
@@ -81,7 +81,7 @@ package.
 ## Analysis model and known approximations
 
 JetBrains LSP cannot consume a KLIB directly, so DotKt's standard library is
-projected into the same analysis JAR as the CLR references. DotKt 0.9.13-beta2
+projected into the same analysis JAR as the CLR references. DotKt 0.9.14
 publishes its path as `$(DotKtStdlib)`. `kotlin.clr` -
 `ClrRef`, `byref`, `StackBuffer`, `Span`, `stackBuffer`, `ClrEvent`, `clrEvent`,
 `EventSubscription` and the rest - therefore comes from DotKt itself and needs no
@@ -98,7 +98,7 @@ instead of an approximation of it. Overloads that collide after JVM erasure keep
 both declarations: the Kotlin name lives in the metadata and only the JVM name
 is mangled.
 
-This is what makes DotKt 0.9.13-beta2's nullability visible. That release annotates the
+This is what makes DotKt 0.9.14's nullability visible. That release annotates the
 KLIB from the CLR's own nullable metadata, so `Exception.InnerException` arrives
 as `Exception?` and `Exception.Message` as a non-null `String`, and only members
 from assemblies without nullable annotations stay platform types. A plain Java
@@ -130,7 +130,7 @@ members become that single parameter list and the overloads it could not express
 are counted.
 
 The report separates what it lost into two kinds. *Upstream gaps* are absences in
-the KLIB itself; none are reported against DotKt 0.9.13-beta2. *Representation
+the KLIB itself; none are reported against DotKt 0.9.14. *Representation
 limits* are constructs Kotlin has no shape for at all. The remaining limit is CLR
 attribute constructor overloads, because a Kotlin annotation class has exactly one
 constructor. Neither category is silent. C# extension methods remain callable both
@@ -154,7 +154,7 @@ the corresponding language flag explicitly.
 node tests/Smoke/verify-lsp.mjs
 ```
 
-This packs the NuGet package, restores the smoke project against DotKt 0.9.13-beta2,
+This packs the NuGet package, restores the smoke project against DotKt 0.9.14,
 and verifies that an ordinary `dotnet build` generated `workspace.json`, the
 analysis libraries, and a `System.Text.StringBuilder` completion declaration.
 The Node verifier additionally starts an installed JetBrains Kotlin language

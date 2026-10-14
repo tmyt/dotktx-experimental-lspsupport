@@ -1,9 +1,9 @@
 # DotKtx.Experimental.LspSupport 引継ぎ
 
-対象: DotKt 0.9.13-beta2 / Kotlin 2.4.10
-最終更新: 2026-10-12 (第4版、DotKt 0.9.13-beta2 で再ベースライン)
+対象: DotKt 0.9.14 / Kotlin 2.4.21
+最終更新: 2026-10-14 (第5版、DotKt 0.9.14 で再ベースライン)
 
-この文書の現在値は DotKt 0.9.13-beta2 で生成した
+この文書の現在値は DotKt 0.9.14 で生成した
 `tests/Smoke/.dotkt/lsp/projection-report.md` を authority としている。0.9.9 以前の数値は比較用の
 履歴であり、現状値として参照しないこと。
 
@@ -76,9 +76,9 @@ workspace.json
 `.dotkt/**/*.kt` は `@(KotlinCompile)` から除外される。生成物が CLR assembly へ混入しないことは
 この package の最重要 boundary である。
 
-## 2. DotKt 0.9.13-beta2 への追従
+## 2. DotKt 0.9.14 への追従
 
-0.9.13-beta2 の MSBuild 統合契約は `DotKt.README.md` に明記されている。
+0.9.14 の MSBuild 統合契約は `DotKt.README.md` に明記されている。
 
 - target `DotKtResolveKlibReferences` の完了後、
 - `@(DotKtResolvedKlibReference)` に全参照 KLIB（絶対 KLIB パス、`SourceAssembly` / TFM / RID メタ付き）、
@@ -133,7 +133,7 @@ generator:
 - `verify.sh` — pack、isolated restore、DotKt build、JAR 構造検査、会計検査、fallback 経路検査。
 - `tools/kotlin-metadata-reference/` — metadata 形式を実物から導出・検証する開発用ツール（7章）。
 
-## 4. DotKt 0.9.13-beta2 実測値
+## 4. DotKt 0.9.14 実測値
 
 Smoke project、参照 KLIB 167 本。
 
@@ -143,15 +143,15 @@ Smoke project、参照 KLIB 167 本。
 
 | 宣言 | KLIB | JAR | 差 |
 |---|---:|---:|---:|
-| class | 4405 | 4405 | 0 |
-| function | 39531 | 39531 | 0 |
-| property | 11637 | 11637 | 0 |
-| constructor | 4470 | 4291 | **-179** |
+| class | 4409 | 4409 | 0 |
+| function | 39533 | 39533 | 0 |
+| property | 11638 | 11638 | 0 |
+| constructor | 4473 | 4294 | **-179** |
 | enum entry | 5232 | 5232 | 0 |
-| top-level function | 6760 | 6760 | 0 |
+| top-level function | 6820 | 6820 | 0 |
 | top-level property | 112 | 112 | 0 |
 
-builtin classifier 134 個は `input.builtin-class` に分離してある（classfile ではなく
+builtin classifier 135 個は `input.builtin-class` に分離してある（classfile ではなく
 `*.kotlin_builtins` から供給されるため）。
 
 constructor の -179 は CLR attribute の overload（6.2）。**この表は verify.sh が検査する** —
@@ -162,20 +162,20 @@ constructor 以外の差が 0 でなければ失敗し、constructor の差も�
 
 ### 4.2 出力
 
-- JAR: 4,473 class（うち file facade 68）+ `META-INF/dotkt_clr.kotlin_module`
+- JAR: 4,477 class（うち file facade 68）+ `META-INF/dotkt_clr.kotlin_module`
 - Kotlin source: **0 file**
-- metadata: 4,473 class
-- 生成時間: KLIB read 0.94 s / Java projection 1.28 s / 合計 2.26 s
+- metadata: 4,477 class
+- 生成時間: KLIB read 1.32 s / Java projection 1.49 s / 合計 2.84 s
 - NuGet package: 約 1.1 MB（PDB を含む）。JVM stdlib 全体ではなく約 17 KB の builtins JAR だけを同梱。
 
 ### 4.3 実 LSP
 
 ```text
-cold index + assertion 10 本完走: 17.1s  (開始時 load 0.8、終了時 1.3)
+cold index + assertion 10 本完走: 21.9s  (開始時 load 2.3、終了時 3.4)
 ```
 
 verifier は負荷平均を併記する。**load が ~1.0 を超えた測定値は比較に使えない**。上記は機能検証時の
-参考値であり、終了時に 1.3 まで上がったため厳密な性能比較値ではない。
+参考値であり、開始時・終了時ともに高負荷のため厳密な性能比較値ではない。
 
 使用 LSP は JetBrains 公式 standalone `v263.6379.0`（VS Code extension 0.0.13 と同世代）。
 
@@ -184,7 +184,7 @@ generic hover / interface definition / definition navigation / metadata hover。
 
 ## 5. 0.9.8 → 0.9.9 で解消した upstream gap
 
-この章は移行履歴。5.2 の後続修正は 0.9.13-beta2 に取り込まれており、現在の report に
+この章は移行履歴。5.2 の後続修正は 0.9.14 にも取り込まれており、現在の report に
 `## upstream gaps` セクションは無い。
 
 第2版で「upstream 依存で手が出せない」と分類した 5 件のうち **4 件が 0.9.9 で解消**した。
@@ -251,7 +251,7 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 
 ### 6.1 upstream gap
 
-**0 件。** 0.9.9 で残っていた幻パッケージ複製（5.2）は 0.9.13-beta2 で解消済み。
+**0 件。** 0.9.9 で残っていた幻パッケージ複製（5.2）は 0.9.14 で解消済み。
 
 ### 6.2 representation limit（Kotlin 側の原理的制約、誰にも直せない）1 件
 
@@ -263,9 +263,9 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 
 ### 6.3 損失ではないが計上しているもの
 
-- `member.mangled.method: 7780` / `member.mangled.field: 69` — JVM 名のみ変更。Kotlin 名は metadata が
+- `member.mangled.method: 8775` / `member.mangled.field: 155` — JVM 名のみ変更。Kotlin 名は metadata が
   保持しているので Kotlin から見れば同一。
-- `java.constructor.synthetic: 2329` — 構造妥当性のために補った no-arg constructor（`ACC_SYNTHETIC`）。
+- `java.constructor.synthetic: 2316` — 構造妥当性のために補った no-arg constructor（`ACC_SYNTHETIC`）。
 - `member.static-abstract: 86` — CLR の static abstract interface member。最小 Code body を与えている。
 
 ## 7. metadata 形式の検証ツール
@@ -317,7 +317,7 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 - CLR attribute の constructor overload（6.2）。Kotlin の言語仕様上、誰にも直せない。
 
 拡張メソッドの幻パッケージ複製は dll2klib の後続修正で解消され、その修正は
-0.9.13-beta2 に含まれている（5.2）。現在の upstream gap は 0。
+0.9.14 にも含まれている（5.2）。現在の upstream gap は 0。
 
 将来の改善候補（欠陥ではない）:
 

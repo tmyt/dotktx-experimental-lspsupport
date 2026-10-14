@@ -14,7 +14,7 @@
 // produces the identical wire representation, and Kotlin's registered extension parser sees them.
 //
 // Every field number here was read off metadata emitted by the real Kotlin compiler rather than
-// recalled, and was rechecked against Kotlin 2.4.10: see docs for the wire dumps this schema was
+// recalled, and was rechecked against Kotlin 2.4.21: see docs for the wire dumps this schema was
 // derived from.
 syntax = "proto2";
 package dotkt.jvm;

@@ -7,7 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../ReceiverFixture/ReceiverFixture.ktproj" />
     <PackageReference Include="DotKtx.Experimental.LspSupport"
-                      Version="0.9.14"
+                      Version="0.9.1"
                       PrivateAssets="all"
                       IncludeAssets="build" />
   </ItemGroup>

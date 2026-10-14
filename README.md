@@ -27,11 +27,14 @@ Add the package as a private, build-only dependency:
 <ItemGroup>
   <PackageReference
     Include="DotKtx.Experimental.LspSupport"
-    Version="0.9.14"
+    Version="0.9.1"
     PrivateAssets="all"
     IncludeAssets="build" />
 </ItemGroup>
 ```
+
+This package targets DotKt SDK `0.9.14`. LspSupport versions are released
+independently of the compiler version.
 
 Add the generated root model to `.gitignore`:
 

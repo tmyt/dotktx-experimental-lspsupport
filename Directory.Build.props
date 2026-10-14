@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <VersionPrefix>0.9.14</VersionPrefix>
+    <!-- LspSupport has its own release sequence, independent of the compiler below. -->
+    <VersionPrefix>0.9.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <!-- The analysis JAR metadata must match this DotKt/Kotlin release pair. -->
     <DotKtVersion>0.9.14</DotKtVersion>

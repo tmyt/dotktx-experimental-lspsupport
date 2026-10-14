@@ -1,5 +1,6 @@
 # DotKtx.Experimental.LspSupport 引継ぎ
 
+パッケージ: LspSupport 0.9.1（コンパイラとは独立した採番）
 対象: DotKt 0.9.14 / Kotlin 2.4.21
 最終更新: 2026-10-14 (第5版、DotKt 0.9.14 で再ベースライン)
 
@@ -375,7 +376,8 @@ cold index 1 回で 400 MiB を超える。verifier は既定で `tests/Smoke/.d
   builtins 抽出元、7章の参照ベクトルを見直す。
 - package の `VersionPrefix` / `VersionSuffix` は LspSupport 独自に刻む。対象コンパイラの
   `DotKtVersion` / `DotKtKotlinVersion` とは別管理であり、更新時に自動的に揃えない。
-  公開済み0.9.14は過去にコンパイラ版へ揃えてしまった結果なので、現在の値を変更する指示ではない。
+  パッケージ0.9.14は過去にコンパイラ版へ揃えてしまった採番。ユーザーの指示により、
+  次のリリースを0.9.1に戻して以降0.9.2、0.9.3と刻む。配布先はユーザー管理のDotKtフィード。
 - nested `./kotlin-lsp` を外側 repo へ誤って追加しない。
 - installed VS Code extension の JAR を直接変更した状態で結果を確定しない。
 

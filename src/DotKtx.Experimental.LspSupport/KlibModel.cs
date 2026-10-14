@@ -72,7 +72,10 @@ internal sealed record KlibTypeRef(
     string? TypeParameterName,
     IReadOnlyList<KlibTypeArgument> Arguments,
     bool IsNullable,
-    KlibTypeRef? FlexibleUpperBound)
+    KlibTypeRef? FlexibleUpperBound,
+    // Function1<T, Unit> alone means a lambda with an `it` parameter. This type-use marker makes
+    // its first argument the implicit receiver instead: T.() -> Unit.
+    bool IsExtensionFunctionType = false)
 {
     public bool IsFlexible => FlexibleUpperBound is not null;
 }

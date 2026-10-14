@@ -3,8 +3,9 @@
 対象: DotKt 0.9.14 / Kotlin 2.4.21
 最終更新: 2026-10-14 (第5版、DotKt 0.9.14 で再ベースライン)
 
-この文書の現在値は DotKt 0.9.14 で生成した
-`tests/Smoke/.dotkt/lsp/projection-report.md` を authority としている。0.9.9 以前の数値は比較用の
+4章の数値は DotKt 0.9.14 リリース時の Smoke（receiver fixture 追加前）で生成した
+`tests/Smoke/.dotkt/lsp/projection-report.md` の記録。現在の会計は再生成された report を参照すること。
+receiver fixture 追加後は参照 KLIB が1本増えている。0.9.9 以前の数値は比較用の
 履歴であり、現状値として参照しないこと。
 
 ## 1. 現在の状態
@@ -25,6 +26,7 @@ Java メンバは参照されない。これにより plain Java classfile で�
 | nullability (`String` / `String?` / `String!`) | metadata の `Type.nullable` / `flexible_upper_bound` |
 | declaration-site variance (`in T` / `out T`) | metadata の `TypeParameter.variance` |
 | extension receiver | metadata の `Function.receiver_type`、JVM 側は第1引数 |
+| receiver 付き関数型 `T.() -> Unit` | `Type.type_annotation` の `kotlin.ExtensionFunctionType` |
 | erasure が衝突する overload | Kotlin 名は metadata、JVM 名だけ mangle |
 | top-level 関数・プロパティ | file facade class + `META-INF/dotkt_clr.kotlin_module` |
 | CLR enum | JVM enum (`ACC_ENUM` + `Signature: Ljava/lang/Enum<Self>;`) |
@@ -131,6 +133,9 @@ generator:
 - `tests/Smoke/src/Program.kt`, `tests/Smoke/src/JavaProjection.kt` — 実際に DotKt でコンパイルされる smoke。
 - `tests/Smoke/verify-lsp.mjs` — 実 LSP を stdio 起動する verifier（assertion 10 本 + 負荷付き時間計測）。
 - `verify.sh` — pack、isolated restore、DotKt build、JAR 構造検査、会計検査、fallback 経路検査。
+- `tests/ReceiverFixture/` — 実 DotKt compiler で作る receiver 関数型の参照ライブラリ。
+  `tests/Smoke/src/ReceiverLambda.kt` を投影 JAR に対して Kotlin JVM compiler でも型チェックし、
+  LSP verifier が暗黙 receiver / 明示 `this` / 普通の `it` / generic 内 / nullable の補完を検査する。
 - `tools/kotlin-metadata-reference/` — metadata 形式を実物から導出・検証する開発用ツール（7章）。
 
 ## 4. DotKt 0.9.14 実測値
@@ -287,6 +292,13 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 
 ### 7.1 実装時に潰した罠（再発しやすい）
 
+- `T.() -> Unit` と `(T) -> Unit` は同じ `Function1<T, Unit>` classifier。前者を区別する
+  `kotlin.ExtensionFunctionType` の type-use annotation を reader が落とすと、`this` が `it` に
+  変わる。KLIB の field 170 から読み、JVM metadata の field 100 と新しい文字列表へ書き直す。
+  `klib.typeref.extension-function` / `metadata.type.extension-function` を計上する。
+  公開済み0.9.14のツールで fixture を投影すると `FontSize` 未解決・`this` 不在を再現し、
+  修正版で型チェックと実LSP補完が通ることを確認。no-metadata の source fallback も marker を保持する。
+
 - classfile の `CONSTANT_Utf8` は **modified UTF-8**。NUL は `0xC0 0x80`。`d1` は先頭がマーカー NUL で
   protobuf payload にも `0x00` が頻出するため、標準 UTF-8 エンコーダでは不正な classfile になる。
 - `var` プロパティには `setter_value_parameter` が必須。欠けると **class 全体の読み込みが中断**する。
@@ -360,7 +372,10 @@ cold index 1 回で 400 MiB を超える。verifier は既定で `tests/Smoke/.d
 - 生成物を `KotlinCompile` に混ぜない。
 - 解析 JAR の API は editor approximation であり、compiler diagnostics より優先しない。
 - `Directory.Build.props` の `DotKtVersion` / `DotKtKotlinVersion` を変えたら metadata version、
-  builtins 抽出元、7章の参照ベクトルを見直す。package version は対象 DotKt リリースに揃えている。
+  builtins 抽出元、7章の参照ベクトルを見直す。
+- package の `VersionPrefix` / `VersionSuffix` は LspSupport 独自に刻む。対象コンパイラの
+  `DotKtVersion` / `DotKtKotlinVersion` とは別管理であり、更新時に自動的に揃えない。
+  公開済み0.9.14は過去にコンパイラ版へ揃えてしまった結果なので、現在の値を変更する指示ではない。
 - nested `./kotlin-lsp` を外側 repo へ誤って追加しない。
 - installed VS Code extension の JAR を直接変更した状態で結果を確定しない。
 

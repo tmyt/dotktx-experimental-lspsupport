@@ -98,6 +98,11 @@ instead of an approximation of it. Overloads that collide after JVM erasure keep
 both declarations: the Kotlin name lives in the metadata and only the JVM name
 is mangled.
 
+Receiver function types also keep their `kotlin.ExtensionFunctionType` marker.
+For example, a `configure: TextBlock.() -> Unit` parameter supplies an implicit
+`this` inside the lambda, whereas `(TextBlock) -> Unit` supplies `it`. The marker
+is retained inside generic arguments and nullable function types as well.
+
 This is what makes DotKt 0.9.14's nullability visible. That release annotates the
 KLIB from the CLR's own nullable metadata, so `Exception.InnerException` arrives
 as `Exception?` and `Exception.Message` as a non-null `String`, and only members

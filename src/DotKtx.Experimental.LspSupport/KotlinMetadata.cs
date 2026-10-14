@@ -380,6 +380,17 @@ internal sealed class KotlinMetadataWriter(JavaEmitContext context)
             message.ClassName = strings.Get(_context.ClassId(reference, owner, extraScope));
         else return null;
 
+        if (reference.IsExtensionFunctionType)
+        {
+            // The KLIB and JVM metadata use different extension numbers and string tables, so
+            // re-encode the receiver marker rather than copying its protobuf bytes.
+            message.TypeAnnotation.Add(new DotKt.Jvm.Metadata.Annotation
+            {
+                Id = strings.Get("kotlin/ExtensionFunctionType"),
+            });
+            _context.Report.Count("metadata.type.extension-function");
+        }
+
         foreach (var argument in reference.Arguments)
         {
             var written = new JvmType.Types.Argument

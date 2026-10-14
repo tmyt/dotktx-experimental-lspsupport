@@ -1,0 +1,6 @@
+<Project Sdk="DotKt.Sdk/0.9.14">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>DotKtx.LspSupport.ReceiverFixture</AssemblyName>
+  </PropertyGroup>
+</Project>

@@ -352,6 +352,7 @@ internal sealed class FragmentRenderer
         // A flexible CLR type cannot be written in Kotlin source. Its non-null lower bound gives completion the
         // least intrusive approximation; authoritative nullability remains the real DotKt compilation's job.
         if (type.IsNullable) result += "?";
+        if (type.IsExtensionFunctionType) result = "@kotlin.ExtensionFunctionType " + result;
         return result;
     }
 

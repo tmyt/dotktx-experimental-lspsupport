@@ -5,6 +5,7 @@
     <StartupObject>ProgramKt</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../ReceiverFixture/ReceiverFixture.ktproj" />
     <PackageReference Include="DotKtx.Experimental.LspSupport"
                       Version="0.9.14"
                       PrivateAssets="all"

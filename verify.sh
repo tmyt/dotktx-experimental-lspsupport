@@ -143,6 +143,17 @@ node -e '
 # Platform types only survive through metadata; the KLIB records tens of thousands of them.
 rg -q '^- metadata\.type\.flexible: [1-9]' "$report"
 rg -q '^- metadata\.class: [1-9]' "$report"
+# Receiver lambdas need a type-use annotation, not merely Function1<T, Unit>. Count both sides,
+# then let Kotlin itself type-check this/implicit receivers and ordinary it against the emitted JAR.
+rg -q '^- klib\.typeref\.extension-function: [1-9]' "$report"
+rg -q '^- metadata\.type\.extension-function: [1-9]' "$report"
+dotkt_version="$(sed -n 's:.*<DotKtVersion>\(.*\)</DotKtVersion>.*:\1:p' "$repo_dir/Directory.Build.props")"
+kotlin_version="$(sed -n 's:.*<DotKtKotlinVersion>\(.*\)</DotKtKotlinVersion>.*:\1:p' "$repo_dir/Directory.Build.props")"
+compiler_lib="$repo_dir/artifacts/.packages/dotkt.toolchain/$dotkt_version/tools/kotc/lib"
+java -cp "$compiler_lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+  -no-stdlib -classpath "$compiler_lib/kotlin-stdlib-$kotlin_version.jar:$java_stub_jar" \
+  -XXLanguage:+CompanionBlocksAndExtensions \
+  -d "$repo_dir/artifacts/verify-receiver-consumer" "$repo_dir/tests/Smoke/src/ReceiverLambda.kt"
 # Overloads that erase to one JVM descriptor are kept by mangling the JVM name, not by dropping them.
 rg -q '^- member\.mangled\.method: [1-9]' "$report"
 # Top-level CLR declarations have no owning class, so they only exist for the analyzer as file facades
@@ -208,6 +219,7 @@ dotnet "$repo_dir/src/DotKtx.Experimental.LspSupport/bin/Release/net10.0/DotKtx.
   --klibs "$repo_dir/tests/Smoke/obj/dotkt-lsp-klibs.rsp" \
   --java-projection 'all;no-metadata' > /dev/null
 fallback_jar="$fallback_out/model/libraries/dotkt-klib-java-stubs.jar"
+rg --no-ignore -q '@kotlin\.ExtensionFunctionType.*receiverfixture\.TextBlock' "$fallback_out/model/stubs"
 javap -classpath "$fallback_jar" -v System.Text.StringBuilder | grep -qv 'kotlin.Metadata('
 javap -classpath "$fallback_jar" System.Text.StringBuilder | grep -q 'public native java.lang.String ToString();'
 # Without metadata there is nowhere to record a Kotlin name, so the erasure collisions come back.

@@ -12,6 +12,9 @@ const sourcePath = join(projectDir, "src", "Program.kt")
 const sourceUri = pathToFileURL(sourcePath).href
 const projectionPath = join(projectDir, "src", "JavaProjection.kt")
 const projectionUri = pathToFileURL(projectionPath).href
+const receiverPath = join(projectDir, "src", "ReceiverLambda.kt")
+const receiverUri = pathToFileURL(receiverPath).href
+const receiverDocumentText = readFileSync(receiverPath, "utf8")
 const rootUri = pathToFileURL(projectDir).href
 const documentText = readFileSync(sourcePath, "utf8")
 // The projection report is the only place that records which representation the build produced, and
@@ -71,6 +74,7 @@ let nextId = 1
 const pending = new Map()
 let incoming = Buffer.alloc(0)
 let latestDiagnostics = []
+let receiverDiagnostics = []
 
 function send(message) {
     const json = JSON.stringify(message)
@@ -109,6 +113,10 @@ function reply(id, result) {
 }
 
 function handle(message) {
+    if (message.method === "textDocument/publishDiagnostics" && message.params?.uri === receiverUri) {
+        receiverDiagnostics = message.params.diagnostics ?? []
+        return
+    }
     if (Object.hasOwn(message, "id") && !message.method) {
         const waiter = pending.get(message.id)
         if (!waiter) return
@@ -280,6 +288,14 @@ try {
             text: projectionDocumentText,
         },
     })
+    notify("textDocument/didOpen", {
+        textDocument: {
+            uri: receiverUri,
+            languageId: "kotlin",
+            version: 1,
+            text: receiverDocumentText,
+        },
+    })
 
     const overlayLabels = await waitForCompletion(
         { line: 0, character: "import kotlin.clr.".length },
@@ -417,6 +433,34 @@ try {
     const interfaceDefinitionUris = interfaceLocations.map(location => location.targetUri ?? location.uri)
     if (!interfaceDefinitionUris.some(uri => uri?.includes("dotkt-klib-java-stubs.jar"))) {
         throw new Error(`ICloneable definition did not navigate to the Java stub: ${interfaceDefinitionUris.join(", ")}`)
+    }
+
+    if (metadataEnabled) {
+        for (const needle of [
+            'configure = { Font',
+            'configure = { this.Font',
+            'ordinary { it.Font',
+            'nested(listOf({ Font',
+            'nullable { Font',
+        ]) {
+            const completion = await request("textDocument/completion", {
+                textDocument: { uri: receiverUri },
+                position: positionAfter(receiverDocumentText, needle),
+                context: { triggerKind: 1 },
+            })
+            if (!completionLabels(completion).includes("FontSize")) {
+                throw new Error(`Lambda completion did not resolve FontSize at ${needle}; labels=${completionLabels(completion).slice(0, 20).join(", ")}; diagnostics=${JSON.stringify(receiverDiagnostics)}`)
+            }
+        }
+        const receiverScope = completionLabels(await request("textDocument/completion", {
+            textDocument: { uri: receiverUri },
+            position: positionAfter(receiverDocumentText, 'configure = { '),
+            context: { triggerKind: 1 },
+        }))
+        if (receiverScope.includes("it")) {
+            throw new Error("A receiver-only lambda incorrectly introduced an implicit it parameter")
+        }
+        console.log("Kotlin LSP receiver lambda: implicit receiver, this, ordinary it, nested and nullable receivers")
     }
 
     console.log("Kotlin LSP DotKt overlay completion: ClrEvent, ClrRef, EventSubscription, Span, StackBuffer, byref, clrEvent, stackBuffer")

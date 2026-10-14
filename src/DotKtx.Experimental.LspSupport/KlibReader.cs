@@ -98,6 +98,7 @@ internal static class KlibReader
                 .Concat(fragment.Properties.SelectMany(TypesOf)))
             {
                 report.Count("klib.typeref.total");
+                if (type.IsExtensionFunctionType) report.Count("klib.typeref.extension-function");
                 if (type.IsFlexible) report.Count("klib.typeref.flexible");
                 else if (type.IsNullable) report.Count("klib.typeref.nullable");
             }
@@ -361,7 +362,8 @@ internal static class KlibReader
                 type.HasFlexibleUpperBoundId,
                 type.FlexibleUpperBoundId,
                 names,
-                table));
+                table),
+            type.TypeAnnotation.Any(annotation => names.ClassName(annotation.Id) == "kotlin.ExtensionFunctionType"));
 }
 
 internal sealed class NameResolver

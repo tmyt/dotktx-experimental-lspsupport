@@ -1,3 +1,4 @@
+import System.Threading.Tasks.Task
 import receiverfixture.text
 import receiverfixture.ordinary
 import receiverfixture.nested
@@ -10,3 +11,9 @@ fun receiverLambdaProbe() {
     nested(listOf({ FontSize = 23.0 }))
     nullable { FontSize = 24.0 }
 }
+
+fun callbackInvokeProbe(report: (String) -> Unit) {
+    report("ready")
+}
+
+fun taskDelayProbe() = Task.Delay(1000)

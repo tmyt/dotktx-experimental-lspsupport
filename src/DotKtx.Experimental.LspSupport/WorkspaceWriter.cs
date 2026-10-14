@@ -101,7 +101,7 @@ internal static class WorkspaceWriter
         };
         var libraries = new JsonArray();
         // The Kotlin core classifiers (`Any`, `Int`, `List`, ...) are the only thing still taken from
-        // the JVM distribution, with Unit.class for callbacks' JVM ABI; every other declaration,
+        // the JVM distribution, with Unit.class and Function.class for callbacks' JVM ABI; every other declaration,
         // including `kotlin.clr`, now comes from DotKt's
         // own CLR standard library KLIB through the projected archive.
         AddLibrary("Kotlin builtins", builtinsJar);
@@ -166,12 +166,11 @@ internal static class WorkspaceWriter
                     ["isHmppEnabled"] = false,
                     ["pureKotlinSourceFolders"] = new JsonArray(),
                     ["kind"] = "default",
-                    ["compilerArguments"] = "J{\"jvmTarget\":\"21\",\"autoAdvanceLanguageVersion\":false,\"autoAdvanceApiVersion\":false,\"apiVersion\":\"2.4\",\"languageVersion\":\"2.4\"}",
-                    // DotKt treats this as a CLR platform capability. The generic JVM analysis host cannot
-                    // install DotKt's LanguageVersionSettings wrapper, so enable the equivalent analysis feature
-                    // explicitly. This workspace never produces Kotlin binaries, hence the preview flag cannot
-                    // mark a build artifact as pre-release.
-                    ["additionalArguments"] = "-Xjvm-default=all -XXLanguage:+CompanionBlocksAndExtensions",
+                    ["compilerArguments"] = "J{\"jvmTarget\":\"21\",\"autoAdvanceLanguageVersion\":false,\"autoAdvanceApiVersion\":false,\"apiVersion\":\"2.4\",\"languageVersion\":\"2.4\",\"companionBlocks\":true,\"companionBlocksAndExtensions\":true}",
+                    // Explicitly enable companion blocks in the analyzer. Keep both serialized argument names
+                    // for Kotlin 2.4 and newer LSP hosts; their compiler argument schema renamed the feature.
+                    // additionalArguments also carries the current CLI spelling for settings consumers.
+                    ["additionalArguments"] = "-Xjvm-default=all -Xcompanion-blocks",
                     ["scriptTemplates"] = null,
                     ["scriptTemplatesClasspath"] = null,
                     ["copyJsLibraryFiles"] = false,

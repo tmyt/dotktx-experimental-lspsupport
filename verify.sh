@@ -22,8 +22,9 @@ for entry in \
   jar tf "$tool_out/kotlin-builtins.jar" | grep -qx "$entry"
 done
 jar tf "$tool_out/kotlin-builtins.jar" | grep -Fxq 'kotlin/Unit.class'
-if jar tf "$tool_out/kotlin-builtins.jar" | grep '\.class$' | grep -Fxqv 'kotlin/Unit.class'; then
-  echo "Unit is the only allowed ABI class in the builtins archive" >&2
+jar tf "$tool_out/kotlin-builtins.jar" | grep -Fxq 'kotlin/Function.class'
+if jar tf "$tool_out/kotlin-builtins.jar" | grep '\.class$' | grep -Evq '^kotlin/(Unit|Function)\.class$'; then
+  echo "Only Unit and Function are allowed ABI classes in the builtins archive" >&2
   exit 1
 fi
 
@@ -155,7 +156,7 @@ compiler_lib="$repo_dir/artifacts/.packages/dotkt.toolchain/$dotkt_version/tools
 # Use exactly the shipped analysis classpath: the full JVM stdlib would mask missing ABI classes.
 java -cp "$compiler_lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-stdlib -classpath "$tool_out/kotlin-builtins.jar:$java_stub_jar" \
-  -XXLanguage:+CompanionBlocksAndExtensions \
+  -Xcompanion-blocks-and-extensions \
   -d "$repo_dir/artifacts/verify-receiver-consumer" \
   "$repo_dir/tests/Smoke/src/ReceiverLambda.kt" "$repo_dir/tests/Smoke/src/SuspendLambda.kt"
 # Overloads that erase to one JVM descriptor are kept by mangling the JVM name, not by dropping them.
@@ -209,8 +210,11 @@ fi
 # Parse JSON so this assertion is independent of System.Text.Json's escaping choices.
 node -e '
   const workspace = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-  const args = workspace.kotlinSettings?.[0]?.additionalArguments ?? "";
-  if (!args.split(/\s+/).includes("-XXLanguage:+CompanionBlocksAndExtensions")) process.exit(1);
+  const settings = workspace.kotlinSettings?.[0];
+  const compiler = JSON.parse(settings.compilerArguments.slice(1));
+  if (compiler.companionBlocks !== true || compiler.companionBlocksAndExtensions !== true) process.exit(1);
+  const args = settings.additionalArguments ?? "";
+  if (!args.split(/\s+/).includes("-Xcompanion-blocks")) process.exit(1);
 ' "$repo_dir/tests/Smoke/workspace.json"
 
 # The plain-Java fallback is the escape hatch if a metadata bug ever ships, so it has to keep working.

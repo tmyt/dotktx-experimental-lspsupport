@@ -27,7 +27,7 @@ Add the package as a private, build-only dependency:
 <ItemGroup>
   <PackageReference
     Include="DotKtx.Experimental.LspSupport"
-    Version="0.9.2"
+    Version="0.9.3"
     PrivateAssets="all"
     IncludeAssets="build" />
 </ItemGroup>
@@ -86,7 +86,11 @@ package.
 ## Analysis model and known approximations
 
 JetBrains LSP cannot consume a KLIB directly, so DotKt's standard library is
-projected into the same analysis JAR as the CLR references. DotKt 0.9.14
+projected into the same analysis JAR as the CLR references. The builtins archive
+also retains `Unit.class` and `Function.class`: callbacks need Unit in their
+type arguments, and calling `(String) -> Unit` needs Function as the superclass
+of Function1. These analysis-only ABI classes come from the compiler
+distribution; the full JVM standard library is not included. DotKt 0.9.14
 publishes its path as `$(DotKtStdlib)`. `kotlin.clr` -
 `ClrRef`, `byref`, `StackBuffer`, `Span`, `stackBuffer`, `ClrEvent`, `clrEvent`,
 `EventSubscription` and the rest - therefore comes from DotKt itself and needs no
@@ -157,10 +161,14 @@ from DotKt's CLR KLIB. The analysis JARs are editor inputs only and must not be 
 as DotKt compiler or runtime inputs.
 
 The generated workspace also enables
-`-XXLanguage:+CompanionBlocksAndExtensions` for LSP analysis. DotKt provides
-this feature as an intrinsic CLR target capability; the generic JVM analysis
+`-Xcompanion-blocks` for LSP analysis. The serialized compiler arguments also
+enable `companionBlocks` explicitly. Kotlin 2.4 hosts use the older
+`companionBlocksAndExtensions` name, so the model retains that setting for
+compatibility. DotKt provides this feature as an intrinsic CLR target capability; the generic JVM analysis
 host has no equivalent target hook, so the analysis-only workspace supplies
-the corresponding language flag explicitly.
+the corresponding language flag explicitly. The old
+`-XXLanguage:+CompanionBlocksAndExtensions` spelling does not enable companion
+blocks in newer LSP hosts, where the language feature was split and renamed.
 
 ## Development
 

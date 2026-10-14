@@ -29,8 +29,8 @@
 
   <!-- The only thing still taken from the JVM distribution is the Kotlin builtins: `Any`, `Int`,
        `List` and the rest of the core classifier set, which the analyzer reads from resources rather
-       than classfiles and which the JVM maps onto java.lang types. Unit.class is the sole ABI bridge:
-       the JVM analyzer needs its physical class when Unit occurs in a callback's type arguments.
+       than classfiles and which the JVM maps onto java.lang types. Unit.class and Function.class are the ABI bridges:
+       the JVM analyzer needs Unit for callback type arguments and Function as the superclass of FunctionN.
        Everything else - including
        kotlin.clr - is projected from DotKt's own CLR standard library KLIB at project build time, so
        no JVM-only stdlib API can reach completion. This is not a DotKt compiler input. -->
@@ -49,6 +49,7 @@
     <ItemGroup>
       <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)**/*.kotlin_builtins" />
       <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)kotlin/Unit.class" />
+      <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)kotlin/Function.class" />
       <_DotKtBuiltinsDrop Include="$(_DotKtBuiltinsStaging)**/*" Exclude="@(_DotKtBuiltinsKeep)" />
     </ItemGroup>
     <Error Condition="'@(_DotKtBuiltinsKeep->Count())' == '0'"

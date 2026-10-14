@@ -485,7 +485,7 @@ try {
         if (receiverScope.includes("it")) {
             throw new Error("A receiver-only lambda incorrectly introduced an implicit it parameter")
         }
-        console.log("Kotlin LSP receiver lambda: implicit receiver, this, ordinary it, nested and nullable receivers")
+        console.log("Kotlin LSP receiver lambda: implicit receiver, this, ordinary it, nested and nullable receivers; callback invocation and Task.Delay(Int)")
 
         const suspendErrors = await errorDiagnostics(suspendUri)
         if (suspendErrors.length !== 0) {

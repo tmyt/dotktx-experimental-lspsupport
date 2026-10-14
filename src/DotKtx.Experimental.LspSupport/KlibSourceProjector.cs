@@ -330,6 +330,23 @@ internal sealed class FragmentRenderer
     private string RenderType(KlibTypeRef? type, IReadOnlyDictionary<int, string> typeParameters)
     {
         if (type is null) return "kotlin.Any?";
+        if (type.IsSuspendFunctionType &&
+            type.ClassName?.StartsWith("kotlin.Function", StringComparison.Ordinal) == true &&
+            type.Arguments.Count >= 2 &&
+            type.Arguments[^2].Type is { ClassName: "kotlin.coroutines.Continuation", Arguments.Count: 1 } continuation)
+        {
+            // KLIB metadata encodes a suspend function in its runtime shape. Kotlin source instead
+            // needs its logical return type and must not expose Continuation as a lambda parameter.
+            var parameters = type.Arguments.Take(type.Arguments.Count - 2).ToArray();
+            var receiver = type.IsExtensionFunctionType && parameters.Length != 0
+                ? RenderType(parameters[0].Type, typeParameters) + "."
+                : "";
+            var arguments = parameters.Skip(receiver.Length == 0 ? 0 : 1)
+                .Select(argument => RenderType(argument.Type, typeParameters));
+            var functionType = "suspend " + receiver + "(" + string.Join(", ", arguments) + ") -> " +
+                RenderType(continuation.Arguments[0].Type, typeParameters);
+            return type.IsNullable ? "(" + functionType + ")?" : functionType;
+        }
         string result;
         if (type.ClassName is { } className)
             result = className;

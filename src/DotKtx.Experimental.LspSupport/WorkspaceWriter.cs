@@ -101,7 +101,8 @@ internal static class WorkspaceWriter
         };
         var libraries = new JsonArray();
         // The Kotlin core classifiers (`Any`, `Int`, `List`, ...) are the only thing still taken from
-        // the JVM distribution; every other declaration, including `kotlin.clr`, now comes from DotKt's
+        // the JVM distribution, with Unit.class for callbacks' JVM ABI; every other declaration,
+        // including `kotlin.clr`, now comes from DotKt's
         // own CLR standard library KLIB through the projected archive.
         AddLibrary("Kotlin builtins", builtinsJar);
         AddLibrary("DotKt: CLR projection", javaStubJar);

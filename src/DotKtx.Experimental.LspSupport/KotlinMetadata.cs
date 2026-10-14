@@ -373,6 +373,8 @@ internal sealed class KotlinMetadataWriter(JavaEmitContext context)
     {
         if (reference is null) return null;
         var message = new JvmType { Nullable = reference.IsNullable };
+        if (reference.RawFlags != 0) message.Flags = reference.RawFlags;
+        if (reference.IsSuspendFunctionType) _context.Report.Count("metadata.type.suspend-function");
         if (reference.TypeParameterId is { } id) message.TypeParameter = id;
         else if (reference.TypeParameterName is { } variable)
             message.TypeParameterName = strings.Get(variable);

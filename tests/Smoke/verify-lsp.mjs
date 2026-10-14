@@ -15,6 +15,9 @@ const projectionUri = pathToFileURL(projectionPath).href
 const receiverPath = join(projectDir, "src", "ReceiverLambda.kt")
 const receiverUri = pathToFileURL(receiverPath).href
 const receiverDocumentText = readFileSync(receiverPath, "utf8")
+const suspendPath = join(projectDir, "src", "SuspendLambda.kt")
+const suspendUri = pathToFileURL(suspendPath).href
+const suspendDocumentText = readFileSync(suspendPath, "utf8")
 const rootUri = pathToFileURL(projectDir).href
 const documentText = readFileSync(sourcePath, "utf8")
 // The projection report is the only place that records which representation the build produced, and
@@ -197,6 +200,16 @@ function hoverText(result) {
     return contents?.value ?? ""
 }
 
+async function errorDiagnostics(uri) {
+    const report = await request("textDocument/diagnostic", {
+        textDocument: { uri },
+    })
+    if (report?.kind !== "full" || !Array.isArray(report.items)) {
+        throw new Error(`Expected a full diagnostic report for ${uri}: ${JSON.stringify(report)}`)
+    }
+    return report.items.filter(diagnostic => diagnostic.severity === 1)
+}
+
 function positionAfter(text, needle) {
     const index = text.indexOf(needle)
     if (index < 0) throw new Error(`Probe text was not found: ${needle}`)
@@ -294,6 +307,14 @@ try {
             languageId: "kotlin",
             version: 1,
             text: receiverDocumentText,
+        },
+    })
+    notify("textDocument/didOpen", {
+        textDocument: {
+            uri: suspendUri,
+            languageId: "kotlin",
+            version: 1,
+            text: suspendDocumentText,
         },
     })
 
@@ -436,6 +457,10 @@ try {
     }
 
     if (metadataEnabled) {
+        const receiverErrors = await errorDiagnostics(receiverUri)
+        if (receiverErrors.length !== 0) {
+            throw new Error(`Receiver lambda diagnostics: ${JSON.stringify(receiverErrors)}`)
+        }
         for (const needle of [
             'configure = { Font',
             'configure = { this.Font',
@@ -461,6 +486,49 @@ try {
             throw new Error("A receiver-only lambda incorrectly introduced an implicit it parameter")
         }
         console.log("Kotlin LSP receiver lambda: implicit receiver, this, ordinary it, nested and nullable receivers")
+
+        const suspendErrors = await errorDiagnostics(suspendUri)
+        if (suspendErrors.length !== 0) {
+            throw new Error(`Suspend lambda diagnostics: ${JSON.stringify(suspendErrors)}`)
+        }
+        for (const [needle, expected] of [
+            ['flow { emi', 'emit'],
+            ['withContext { delay(3L); mar', 'marker'],
+            ['nullableSuspend { delay(6L); mar', 'marker'],
+        ]) {
+            const completion = await request("textDocument/completion", {
+                textDocument: { uri: suspendUri },
+                position: positionAfter(suspendDocumentText, needle),
+                context: { triggerKind: 1 },
+            })
+            if (!completionLabels(completion).includes(expected)) {
+                throw new Error(`Suspend lambda completion did not resolve ${expected} at ${needle}`)
+            }
+        }
+        const inferredHover = hoverText(await request("textDocument/hover", {
+            textDocument: { uri: suspendUri },
+            position: positionAfter(suspendDocumentText, 'val typed: Int = infer'),
+        }))
+        if (!/inferred:\s*Int\b/.test(inferredHover)) {
+            throw new Error(`withContext did not infer Int: ${inferredHover}`)
+        }
+        // A normal callback must still reject suspend calls. This prevents a "fix" that simply
+        // grants coroutine context to every lambda or suppresses the diagnostic altogether.
+        notify("textDocument/didChange", {
+            textDocument: { uri: suspendUri, version: 2 },
+            contentChanges: [{ text: suspendDocumentText +
+                '\nfun notSuspendProbe() { receiverfixture.ordinary { delay(7L) } }\n' }],
+        })
+        const negativeErrors = await errorDiagnostics(suspendUri)
+        if (negativeErrors.length !== 1 || negativeErrors[0].code !== "ILLEGAL_SUSPEND_FUNCTION_CALL") {
+            throw new Error(`Ordinary callback did not reject a suspend call: ${JSON.stringify(negativeErrors)}`)
+        }
+        notify("textDocument/didChange", {
+            textDocument: { uri: suspendUri, version: 3 },
+            contentChanges: [{ text: suspendDocumentText }],
+        })
+        console.log("Kotlin LSP suspend lambdas: flow/emit, launch/delay, withContext inference, plain/nested/nullable callbacks, no error diagnostics")
+        console.log("Kotlin LSP negative control: ordinary callback still reports ILLEGAL_SUSPEND_FUNCTION_CALL")
     }
 
     console.log("Kotlin LSP DotKt overlay completion: ClrEvent, ClrRef, EventSubscription, Span, StackBuffer, byref, clrEvent, stackBuffer")

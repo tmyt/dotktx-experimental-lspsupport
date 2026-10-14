@@ -1,8 +1,10 @@
 # DotKtx.Experimental.LspSupport 引継ぎ
 
-パッケージ: LspSupport 0.9.1（コンパイラとは独立した採番）
+パッケージ: LspSupport 0.9.2（コンパイラとは独立した採番）
 対象: DotKt 0.9.14 / Kotlin 2.4.21
-最終更新: 2026-10-14 (第5版、DotKt 0.9.14 で再ベースライン)
+最終更新: 2026-10-14 (第6版、suspend 関数型の投影を修正)
+
+0.9.2 では suspend 型フラグと Unit ABI の修正を取り込んだ。
 
 4章の数値は DotKt 0.9.14 リリース時の Smoke（receiver fixture 追加前）で生成した
 `tests/Smoke/.dotkt/lsp/projection-report.md` の記録。現在の会計は再生成された report を参照すること。
@@ -28,6 +30,7 @@ Java メンバは参照されない。これにより plain Java classfile で�
 | declaration-site variance (`in T` / `out T`) | metadata の `TypeParameter.variance` |
 | extension receiver | metadata の `Function.receiver_type`、JVM 側は第1引数 |
 | receiver 付き関数型 `T.() -> Unit` | `Type.type_annotation` の `kotlin.ExtensionFunctionType` |
+| suspend 関数型 | `Type.flags` の `SUSPEND_TYPE` (bit 0) |
 | erasure が衝突する overload | Kotlin 名は metadata、JVM 名だけ mangle |
 | top-level 関数・プロパティ | file facade class + `META-INF/dotkt_clr.kotlin_module` |
 | CLR enum | JVM enum (`ACC_ENUM` + `Signature: Ljava/lang/Enum<Self>;`) |
@@ -96,10 +99,13 @@ private 名（`@(_DotKtKlibReference)`、`DotKtGenerateReferenceKlibs` 等）へ
 これにより JVM `kotlin-stdlib.jar` 近似と手書き overlay を**廃止した**。`kotlin.clr` は DotKt 自身の
 宣言から来るので、手動メンテは不要になった。
 
-JVM 側から持ってきているのは `*.kotlin_builtins` リソースだけである。`kotlin.Any` / `Int` /
+JVM 側から持ってきているのは `*.kotlin_builtins` リソースと `kotlin/Unit.class` だけである。`kotlin.Any` / `Int` /
 `collections.List` などの中核 classifier は classfile ではなくこのリソースで供給され、JVM が
 `java.lang.*` と primitive へ写像する。プラットフォーム中立なので JVM 版をそのまま使い、
 同名の classfile は出さない（除外集合はリソースを実際に読んで決めるので、手書きリストが腐ることはない）。
+例外の `Unit.class` は callback の型引数に `Unit` が現れるときの JVM ABI 解決に必要。
+resources だけだと実 LSP が `MISSING_DEPENDENCY_CLASS` を出す。verify.sh は classfile を Unit 1つに
+制限し、consumer の型チェックも JVM stdlib 全体ではなく実際に同梱する archive で行う。
 
 ## 3. 主要ファイル
 
@@ -292,6 +298,17 @@ report が自分で 2 種類に分類する。未分類のものは無い。
 `DotKtKotlinVersion` が変わったら再検証すること。README に手順がある。
 
 ### 7.1 実装時に潰した罠（再発しやすい）
+
+- suspend 関数**宣言**の flag と suspend 関数**型**の flag は別物。KLIB の `Type.flags`
+  bit 0 (`SUSPEND_TYPE`) を落とすと、`suspend Scope.() -> T` が
+  `Scope.(Continuation<T>) -> Any?` に見え、`flow { emit(...) }` / `launch { delay(...) }` が
+  `ILLEGAL_SUSPEND_FUNCTION_CALL`、`withContext` が型推論失敗になる。`KlibTypeRef.RawFlags`
+  で保持し、JVM metadata の `Type.flags` へ渡す。no-metadata source fallback は Continuation を
+  外して論理的な suspend 関数型へ戻す。
+  `klib.typeref.suspend-function` / `metadata.type.suspend-function` を計上する。
+  `tests/ReceiverFixture/SuspendFixture.kt` と `tests/Smoke/src/SuspendLambda.kt` で receiver / plain /
+  nested / nullable を検証し、実 LSP の error diagnostics 0件と戻り値 Int の hover を確認する。
+  通常 callback 内の suspend 呼び出しは引き続き拒否する negative control もある。
 
 - `T.() -> Unit` と `(T) -> Unit` は同じ `Function1<T, Unit>` classifier。前者を区別する
   `kotlin.ExtensionFunctionType` の type-use annotation を reader が落とすと、`this` が `it` に

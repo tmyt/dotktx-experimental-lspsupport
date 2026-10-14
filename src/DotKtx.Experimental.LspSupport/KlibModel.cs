@@ -75,9 +75,13 @@ internal sealed record KlibTypeRef(
     KlibTypeRef? FlexibleUpperBound,
     // Function1<T, Unit> alone means a lambda with an `it` parameter. This type-use marker makes
     // its first argument the implicit receiver instead: T.() -> Unit.
-    bool IsExtensionFunctionType = false)
+    bool IsExtensionFunctionType = false,
+    // Type flags are separate from declaration flags. In particular, SUSPEND_TYPE is what turns
+    // FunctionN<..., Continuation<R>, Any?> back into a suspend function type on deserialization.
+    KlibRawFlags RawFlags = default)
 {
     public bool IsFlexible => FlexibleUpperBound is not null;
+    public bool IsSuspendFunctionType => KlibFlags.TypeIsSuspend(RawFlags);
 }
 
 internal sealed record KlibTypeArgument(KlibProjection Projection, KlibTypeRef? Type);
@@ -389,6 +393,7 @@ internal static class KlibFlags
     private const int FunctionIsOperatorBit = 8;
     private const int FunctionIsInfixBit = 9;
     private const int FunctionIsSuspendBit = 13;
+    private const int TypeIsSuspendBit = 0;
     private const int ConstructorIsSecondaryBit = 4;
     private const int ValueParameterHasDefaultBit = 1;
     private const int FunctionIsClrStaticBit = 18;
@@ -406,6 +411,7 @@ internal static class KlibFlags
     public static bool FunctionIsOperator(int flags) => Bit(flags, FunctionIsOperatorBit);
     public static bool FunctionIsInfix(int flags) => Bit(flags, FunctionIsInfixBit);
     public static bool FunctionIsSuspend(int flags) => Bit(flags, FunctionIsSuspendBit);
+    public static bool TypeIsSuspend(int flags) => Bit(flags, TypeIsSuspendBit);
     public static bool ConstructorIsSecondary(int flags) => Bit(flags, ConstructorIsSecondaryBit);
     public static bool ValueParameterHasDefault(int flags) => Bit(flags, ValueParameterHasDefaultBit);
     public static bool FunctionIsClrStatic(int flags) => Bit(flags, FunctionIsClrStaticBit);

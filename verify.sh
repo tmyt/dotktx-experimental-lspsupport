@@ -21,8 +21,9 @@ for entry in \
   kotlin/reflect/reflect.kotlin_builtins; do
   jar tf "$tool_out/kotlin-builtins.jar" | grep -qx "$entry"
 done
-if jar tf "$tool_out/kotlin-builtins.jar" | grep -q '\.class$'; then
-  echo "The builtins archive must carry resources only, never classfiles" >&2
+jar tf "$tool_out/kotlin-builtins.jar" | grep -Fxq 'kotlin/Unit.class'
+if jar tf "$tool_out/kotlin-builtins.jar" | grep '\.class$' | grep -Fxqv 'kotlin/Unit.class'; then
+  echo "Unit is the only allowed ABI class in the builtins archive" >&2
   exit 1
 fi
 
@@ -147,13 +148,16 @@ rg -q '^- metadata\.class: [1-9]' "$report"
 # then let Kotlin itself type-check this/implicit receivers and ordinary it against the emitted JAR.
 rg -q '^- klib\.typeref\.extension-function: [1-9]' "$report"
 rg -q '^- metadata\.type\.extension-function: [1-9]' "$report"
+rg -q '^- klib\.typeref\.suspend-function: [1-9]' "$report"
+rg -q '^- metadata\.type\.suspend-function: [1-9]' "$report"
 dotkt_version="$(sed -n 's:.*<DotKtVersion>\(.*\)</DotKtVersion>.*:\1:p' "$repo_dir/Directory.Build.props")"
-kotlin_version="$(sed -n 's:.*<DotKtKotlinVersion>\(.*\)</DotKtKotlinVersion>.*:\1:p' "$repo_dir/Directory.Build.props")"
 compiler_lib="$repo_dir/artifacts/.packages/dotkt.toolchain/$dotkt_version/tools/kotc/lib"
+# Use exactly the shipped analysis classpath: the full JVM stdlib would mask missing ABI classes.
 java -cp "$compiler_lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
-  -no-stdlib -classpath "$compiler_lib/kotlin-stdlib-$kotlin_version.jar:$java_stub_jar" \
+  -no-stdlib -classpath "$tool_out/kotlin-builtins.jar:$java_stub_jar" \
   -XXLanguage:+CompanionBlocksAndExtensions \
-  -d "$repo_dir/artifacts/verify-receiver-consumer" "$repo_dir/tests/Smoke/src/ReceiverLambda.kt"
+  -d "$repo_dir/artifacts/verify-receiver-consumer" \
+  "$repo_dir/tests/Smoke/src/ReceiverLambda.kt" "$repo_dir/tests/Smoke/src/SuspendLambda.kt"
 # Overloads that erase to one JVM descriptor are kept by mangling the JVM name, not by dropping them.
 rg -q '^- member\.mangled\.method: [1-9]' "$report"
 # Top-level CLR declarations have no owning class, so they only exist for the analyzer as file facades
@@ -220,6 +224,8 @@ dotnet "$repo_dir/src/DotKtx.Experimental.LspSupport/bin/Release/net10.0/DotKtx.
   --java-projection 'all;no-metadata' > /dev/null
 fallback_jar="$fallback_out/model/libraries/dotkt-klib-java-stubs.jar"
 rg --no-ignore -q '@kotlin\.ExtensionFunctionType.*receiverfixture\.TextBlock' "$fallback_out/model/stubs"
+rg --no-ignore -q 'block: suspend suspendfixture.CoroutineScope\.\(\) -> T' "$fallback_out/model/stubs"
+rg --no-ignore -q 'block: \(suspend suspendfixture.CoroutineScope\.\(\) -> kotlin.Unit\)\?' "$fallback_out/model/stubs"
 javap -classpath "$fallback_jar" -v System.Text.StringBuilder | grep -qv 'kotlin.Metadata('
 javap -classpath "$fallback_jar" System.Text.StringBuilder | grep -q 'public native java.lang.String ToString();'
 # Without metadata there is nowhere to record a Kotlin name, so the erasure collisions come back.

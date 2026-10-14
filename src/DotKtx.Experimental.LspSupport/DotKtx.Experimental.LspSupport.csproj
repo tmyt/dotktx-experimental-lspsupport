@@ -29,12 +29,14 @@
 
   <!-- The only thing still taken from the JVM distribution is the Kotlin builtins: `Any`, `Int`,
        `List` and the rest of the core classifier set, which the analyzer reads from resources rather
-       than classfiles and which the JVM maps onto java.lang types. Everything else - including
+       than classfiles and which the JVM maps onto java.lang types. Unit.class is the sole ABI bridge:
+       the JVM analyzer needs its physical class when Unit occurs in a callback's type arguments.
+       Everything else - including
        kotlin.clr - is projected from DotKt's own CLR standard library KLIB at project build time, so
        no JVM-only stdlib API can reach completion. This is not a DotKt compiler input. -->
   <Target Name="BuildDotKtLspBuiltins"
           AfterTargets="Build"
-          Inputs="$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar"
+          Inputs="$(MSBuildProjectFullPath);$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar"
           Outputs="$(TargetDir)kotlin-builtins.jar">
     <PropertyGroup>
       <_DotKtJvmStdlib>$(PkgDotKt_Toolchain)/tools/kotc/lib/kotlin-stdlib-$(DotKtKotlinVersion).jar</_DotKtJvmStdlib>
@@ -46,6 +48,7 @@
     <Unzip SourceFiles="$(_DotKtJvmStdlib)" DestinationFolder="$(_DotKtBuiltinsStaging)" />
     <ItemGroup>
       <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)**/*.kotlin_builtins" />
+      <_DotKtBuiltinsKeep Include="$(_DotKtBuiltinsStaging)kotlin/Unit.class" />
       <_DotKtBuiltinsDrop Include="$(_DotKtBuiltinsStaging)**/*" Exclude="@(_DotKtBuiltinsKeep)" />
     </ItemGroup>
     <Error Condition="'@(_DotKtBuiltinsKeep->Count())' == '0'"
